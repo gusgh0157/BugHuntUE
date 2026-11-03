@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "{742FBEA6-499A-EE5E-5FE7-408499D85906}",
+	"EngineAssociation": "5.8",
 	"Category": "",
 	"Description": "BugHunt UE: Unreal Engine bug tracing practice labs",
 	"Modules": [
