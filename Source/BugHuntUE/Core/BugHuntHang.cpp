@@ -10,7 +10,7 @@ float GHangBudgetSeconds = 2.f;
 FAutoConsoleVariableRef CVarHangBudget(
 	TEXT("BugHunt.HangBudgetSeconds"),
 	GHangBudgetSeconds,
-	TEXT("8부 랩의 루프/대기가 이 시간(초)을 넘으면 '응답 없음'으로 FAIL 처리하고 빠져나온다. 기본 2초."));
+	TEXT("10부 멈춤 랩의 루프/대기가 이 시간(초)을 넘으면 '응답 없음'으로 FAIL 처리하고 빠져나온다. 기본 2초."));
 }
 
 double HangBudgetSeconds()

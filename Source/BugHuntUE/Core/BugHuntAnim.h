@@ -11,7 +11,7 @@ class UAnimMontage;
 class UAnimSequenceBase;
 class USkeletalMeshComponent;
 
-// 6부(애니메이션) 랩 공용. 이 파일에는 버그가 없다.
+// 8부(애니메이션) 랩 공용. 이 파일에는 버그가 없다.
 // 엔진 기본 콘텐츠의 튜토리얼 캐릭터(TutorialTPP)를 쓰고, 몽타주와 노티파이는 에셋 대신 코드로 만든다.
 // 애님 블루프린트 없이 기본 UAnimInstance 를 쓰므로, 몽타주는 재생·노티파이·종료 이벤트까지 정상으로 돌지만
 // 화면의 포즈는 바뀌지 않는다(슬롯 노드가 없음). 랩은 포즈가 아니라 노티파이 횟수와 상태값으로 판정한다.
