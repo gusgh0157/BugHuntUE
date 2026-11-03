@@ -32,8 +32,12 @@ void ABH_Lab04::StartLab()
 
 	// 실제 게임에서는 GC가 약 60초마다 돈다. 1분을 기다리지 않도록 지금 바로 GC를 돌린다.
 	// (콘솔 명령 `obj gc` 와 같다.)
+	// GC 전에 퀘스트 기록을 약한 포인터로 지켜본다 (붙잡지는 않는다). GC 뒤 크래시 여부는 메모리 상태에 따라 "가끔"이라,
+	// 판정은 이 약한 포인터로 먼저 한다.
+	const TWeakObjectPtr<UBH_QuestLog> Watch = FindObject<UBH_QuestLog>(Giver, TEXT("QuestLog"));
 	BugHunt::Note(TEXT("... 시간이 흐른다 (GC 실행) ..."));
 	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+	BugHunt::ExpectTrue(TEXT("GC 뒤에도 퀘스트 기록이 살아 있음"), Watch.IsValid());
 
 	Giver->AcceptQuest(TEXT("대장장이에게 광석 전달"));
 	BugHunt::Expect(TEXT("받은 퀘스트 수"), 2, Giver->NumAccepted());

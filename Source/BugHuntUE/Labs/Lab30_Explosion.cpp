@@ -1,5 +1,9 @@
 // [주의] 이 랩은 소리를 냅니다. 실행 전에 시스템 볼륨을 낮추고, 헤드폰을 쓴다면 귀에서 떼고 시작하세요.
 //        (실습용 소리는 볼륨 배율 0.5 로 재생합니다.)
+//
+// 검사 방법: Explode() 가 돌려준 UAudioComponent 를 0.1초 뒤에 보고 "아직 재생 중인가"를 판정합니다.
+// 그래서 고칠 때도 Explode() 는 재생 중인 컴포넌트를 돌려줘야 합니다. 컴포넌트를 돌려주지 않는 함수
+// (UGameplayStatics::PlaySoundAtLocation 등)로 바꾸면 소리는 제대로 나도 검사가 확인할 수 없어 FAIL 입니다.
 
 #include "Labs/Lab30_Explosion.h"
 #include "Core/BugHuntReport.h"
@@ -91,4 +95,5 @@ void ABH_Lab30::StartLab()
 // (UGameplayStatics::SpawnSoundAtLocation. 또는 액터를 바로 지우지 말고 숨긴 뒤 SetLifeSpan)
 // 함정 하나 더: SpawnSoundAtLocation(this, ...) 처럼 첫 인자(WorldContextObject)에 곧 사라질 액터를 넘기면,
 // 엔진은 그 액터를 컴포넌트의 주인으로 삼습니다. 고친 뒤에도 로그의 "폭발음 컴포넌트" 경로에 누가 들어 있는지 확인하세요.
+// 검사는 Explode() 가 돌려준 컴포넌트를 봅니다. PlaySoundAtLocation 은 컴포넌트를 돌려주지 않으므로, 소리는 나도 검사는 FAIL 입니다.
 #pragma endregion

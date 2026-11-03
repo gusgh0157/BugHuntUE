@@ -34,8 +34,14 @@ void ABH_Lab18::StartLab()
 	BugHunt::Note(FString::Printf(TEXT("플레이어와 정찰병이 칸 %d개씩 밝혔다. 겹치는 칸 (%d,0)."), Length, Cross));
 
 	BugHunt::Expect(TEXT("밝혀진 칸 수 (겹친 칸은 한 번)"), Unique.Num(), Fog->Revealed.Num());
-	BugHunt::ExpectTrue(TEXT("(0,0) 은 밝혀졌다"), Fog->IsRevealed(0, 0));
-	BugHunt::ExpectTrue(FString::Printf(TEXT("(%d,%d) 은 밝혀졌다"), Cross, Length - 1), Fog->IsRevealed(Cross, Length - 1));
+	// 밝힌 칸 하나하나를 다시 물어본다 (칸 하나만 보면 운 좋게 같은 버킷에 들어가 통과할 수 있다).
+	int32 Found = 0;
+	for (int32 i = 0; i < Length; ++i)
+	{
+		Found += Fog->IsRevealed(i, 0) ? 1 : 0;
+		Found += Fog->IsRevealed(Cross, i) ? 1 : 0;
+	}
+	BugHunt::Expect(TEXT("밝힌 칸을 물었을 때 밝혀졌다고 답한 수"), 2 * Length, Found);
 	BugHunt::ExpectTrue(TEXT("(9,9) 는 아직 안개"), !Fog->IsRevealed(9, 9));
 	FinishLab();
 }

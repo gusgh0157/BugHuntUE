@@ -36,13 +36,13 @@ void ABH_Lab33::StartLab()
 	Ruby.Name = TEXT("루비 반지");
 	Ruby.Icon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Engine/EngineResources/AICON-Red.AICON-Red")));
 
-	FBH_ItemData Potion;
-	Potion.Name = TEXT("회복 물약");
-	Potion.Icon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Engine/EngineResources/DefaultTexture.DefaultTexture")));
+	FBH_ItemData PotionData;
+	PotionData.Name = TEXT("회복 물약");
+	PotionData.Icon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(TEXT("/Engine/EngineResources/DefaultTexture.DefaultTexture")));
 
 	BugHunt::Note(FString::Printf(TEXT("루비 반지 아이콘 %s, 회복 물약 아이콘 %s"),
 		Ruby.Icon.IsValid() ? TEXT("메모리에 있음") : TEXT("메모리에 없음"),
-		Potion.Icon.IsValid() ? TEXT("메모리에 있음") : TEXT("메모리에 없음")));
+		PotionData.Icon.IsValid() ? TEXT("메모리에 있음") : TEXT("메모리에 없음")));
 
 	Slot = NewObject<UBH_ItemSlot>(this);
 	Slot->Init();
@@ -50,19 +50,19 @@ void ABH_Lab33::StartLab()
 	// 스크롤: 이 칸에 루비 반지가 보였다가, 바로 다음 프레임에 회복 물약으로 바뀐다 (칸 재사용).
 	UE_LOG(LogBugHunt, Log, TEXT("  프레임 %llu: 칸 ← 루비 반지"), GFrameCounter);
 	Slot->ShowItem(Ruby);
-	After(0.0f, [this, Potion]
+	After(0.0f, [this, PotionData]
 	{
 		UE_LOG(LogBugHunt, Log, TEXT("  프레임 %llu: 칸 ← 회복 물약"), GFrameCounter);
-		Slot->ShowItem(Potion);
+		Slot->ShowItem(PotionData);
 	});
 
-	After(1.0f, [this, Potion]
+	After(1.0f, [this, PotionData]
 	{
 		const UObject* Shown = Slot->IconImage->GetBrush().GetResourceObject();
 		BugHunt::Note(FString::Printf(TEXT("칸에 적힌 이름 '%s', 그려진 아이콘 %s"), *Slot->ShownName, *GetNameSafe(Shown)));
-		BugHunt::ExpectTrue(TEXT("칸 이름이 회복 물약"), Slot->ShownName == Potion.Name);
+		BugHunt::ExpectTrue(TEXT("칸 이름이 회복 물약"), Slot->ShownName == PotionData.Name);
 		BugHunt::ExpectTrue(FString::Printf(TEXT("칸 아이콘이 회복 물약 아이콘 (실제: %s)"), *GetNameSafe(Shown)),
-			Shown != nullptr && Shown == Potion.Icon.Get());
+			Shown != nullptr && Shown == PotionData.Icon.Get());
 		FinishLab();
 	});
 }

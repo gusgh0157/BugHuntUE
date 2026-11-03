@@ -43,7 +43,8 @@ void ABH_HealthPickup::OnTouched(AActor* Toucher)
 **수정 (택1):**
 - `Scoreboard = NewObject<...>` 를 `SpawnActor` 위로 옮긴다.
 - 더 좋게는 남이 쓸 멤버를 **생성자**에서 `CreateDefaultSubobject<UBH_Scoreboard>(TEXT("Scoreboard"))`로 만들거나 `PostInitializeComponents`에서 준비한다. 둘 다 어떤 BeginPlay 보다도 먼저 실행된다.
-- HUD 쪽 방어: `if (UBH_Scoreboard* Board = Manager->GetScoreboard()) { ... }`
+
+**추가 방어 (단독으로는 FAIL):** HUD 쪽 `if (UBH_Scoreboard* Board = Manager->GetScoreboard()) { ... }`. 크래시는 막지만 HUD 가 점수판에 구독하지 못해서 점수가 갱신되지 않는다. 위의 수정과 함께 쓴다.
 
 **교훈:** 언리얼 액터의 초기화 순서는 `생성자 → (속성 값 적용) → PostInitializeComponents → BeginPlay`. 같은 BeginPlay 끼리의 순서는 "스폰 순서/레벨 로드 순서"라서 믿으면 안 된다. 크래시 위치가 엔진 템플릿(`FMRSWRecursiveAccessDetector`, `AddDelegateInstance`)이어도 처음 나오는 내 코드부터 보면 된다.
 
@@ -116,7 +117,7 @@ void UBH_CombatLogPanel::Close()
 }
 ```
 (또는 `FDelegateHandle Handle = ...AddUObject(...)`를 멤버로 저장해 `Remove(Handle)`.)
-**교훈:** `AddUObject`/`AddDynamic`은 객체가 **파괴되면** 안전하게 무시되지만, 살아 있는 객체는 언제까지나 불린다. **Add 한 곳마다 짝이 되는 Remove**(EndPlay, Close, Deinitialize)가 있어야 한다. `AddDynamic`을 같은 함수로 두 번 하면 ensure가 뜨지만 `AddUObject`/`AddLambda`는 조용히 중복된다.
+**교훈:** `AddUObject`/`AddDynamic`은 객체가 **파괴되면** 안전하게 무시되지만, 살아 있는 객체는 언제까지나 불린다. **Add 한 곳마다 짝이 되는 Remove**(EndPlay, Close, Deinitialize)가 있어야 한다. `AddDynamic`을 같은 함수로 두 번 하면 Development 빌드에서는 ensure 가 뜨지만 **그래도 두 번 등록된다**(UE 5.8 `ScriptDelegates.h` 의 `AddInternal`: `#if DO_ENSURE` 검사 뒤에 그대로 `Add`). Shipping 에서는 ensure 도 없이 조용히 중복된다. `AddUObject`/`AddLambda`는 어느 빌드에서나 조용히 중복된다. 중복을 막으려면 `AddUniqueDynamic`.
 
 ## Lab 6 — 지역 변수에 받은 타이머 핸들
 ```
@@ -174,7 +175,9 @@ const float Distance = FVector::Dist2D(GetActorLocation(), Target);
 틀린 결과:     점수 700, 허수아비 2개가 서 있음
 멈춘 위치:     Score += 중단점 두 번째 적중 → CurrentTarget = BH_Dummy_0, Health -10
 처음 어긋난 곳: 화살 4: if (!CurrentTarget) 가 false (포인터는 그대로) → 쓰러진 BH_Dummy_0 을 다시 쏨 → Health <= 0 이라 또 "처치"
-진짜 원인:     Destroy() 는 액터를 Garbage 로 표시만 한다. UPROPERTY 포인터가 nullptr 이 되는 건 다음 GC 때다.
+진짜 원인:     Destroy() 는 액터를 Garbage 로 표시만 한다. UPROPERTY 포인터가 nullptr 이 되는 건 다음 GC 때다
+               (가비지 제거가 켜져 있을 때만. UE 5.8 의 gc.GarbageEliminationEnabled, 옛 이름 gc.PendingKillEnabled.
+                꺼져 있으면 GC 는 참조된 Garbage 객체를 지우지도 nullptr 로 만들지도 않는다.)
 ```
 **수정:**
 ```cpp
@@ -187,7 +190,7 @@ if (!IsValid(CurrentTarget))
     return;
 }
 ```
-**교훈:** UObject 포인터의 "살아 있음" 검사는 `IsValid()`. `if (Ptr)`은 "주소가 있다"는 뜻일 뿐이다. 이 버그는 **GC가 언제 도느냐에 따라** 가끔 사라진다(GC 뒤엔 포인터가 정리되어 nullptr). "가끔만 생기는 버그"의 전형. 같은 파일의 `FindNearestTarget`이 이미 `IsValid`를 쓰고 있었다는 점도 단서였다.
+**교훈:** UObject 포인터의 "살아 있음" 검사는 `IsValid()`. `if (Ptr)`은 "주소가 있다"는 뜻일 뿐이다. 이 버그는 **GC가 언제 도느냐에 따라** 가끔 사라진다(가비지 제거가 켜져 있으면 GC 뒤에 포인터가 nullptr 로 정리된다). "가끔만 생기는 버그"의 전형. 같은 파일의 `FindNearestTarget`이 이미 `IsValid`를 쓰고 있었다는 점도 단서였다.
 
 ## Lab 10 — Config 파일이 생성자 기본값을 덮어씀
 ```
@@ -312,7 +315,7 @@ Order.RemoveAt(Index);        // 뒤를 한 칸씩 당긴다. 순서 유지, O(n
 
 ## Lab 18 — operator== 는 좌표만, GetTypeHash 는 Source 까지 봄
 ```
-틀린 결과:     밝혀진 칸 수 기대 7, 실제 8 / (0,0) 은 밝혀졌다 FAIL / (2,3) 은 밝혀졌다 FAIL
+틀린 결과:     밝혀진 칸 수 기대 7, 실제 8 / 밝힌 칸 8개를 물었더니 "밝혀졌다"는 2개뿐 (공개 입력. 몇 개가 맞는지는 해시에 따라 다름)
 멈춘 위치:     조사식 Revealed 를 펼치면 (2,0) 이 Source 만 다른 채로 두 번 들어 있다.
                IsRevealed(0,0) 은 Source 가 빈 키로 찾는다 → 해시가 달라 다른 버킷을 본다
 진짜 원인:     TSet/TMap 은 GetTypeHash 로 버킷을 고른 뒤 그 안에서만 == 로 비교한다.
@@ -540,7 +543,7 @@ void ABH_Blaster::Fire()
     ... (기존 코드는 예비 경로로 남겨도 된다)
 }
 ```
-게임 중 멈춤(히치)까지 피하려면 `LoadSynchronous` 대신 장착 시점에 `RequestAsyncLoad`로 미리 불러 두고 반환된 `TSharedPtr<FStreamableHandle>`을 멤버로 보관한다. 아예 무기의 `UPROPERTY` 하드 레퍼런스로 바꾸면 무기와 함께 로드된다.
+게임 중 멈춤(히치)까지 피하려면 `LoadSynchronous` 대신 장착 시점에 `RequestAsyncLoad`로 미리 불러 두고 반환된 `TSharedPtr<FStreamableHandle>`을 멤버로 보관한다. 단, 이 방법은 **시간에 기대는** 해법이다. 장착하자마자 쏘면 로드가 아직 안 끝나서 첫 발이 여전히 늦을 수 있으므로, 로드 완료 전에 쏘면 동기 로드로 넘어가는 예비 경로(위 코드)를 함께 둔다. 이 랩의 검사는 장착 직후 쏘므로 예비 경로 없이는 FAIL 이 날 수 있다. 아예 무기의 `UPROPERTY` 하드 레퍼런스로 바꾸면 무기와 함께 로드된다.
 **교훈:** "첫 번째만 늦다"는 지연 로드를 1순위로 의심한다. 소프트 레퍼런스는 **로드 시점과 수명을 내가 책임진다**는 뜻이다. 쏠 때 동기 로드하면 늦지는 않지만 그 프레임이 멈추고(히치), 비동기 로드하면 멈추지 않지만 늦는다. 정답은 "쓰기 전에 미리, 그리고 붙잡아 두기". 실제 프로젝트에서는 Unreal Insights의 Asset Loading 트랙으로 "발사 순간에 로드가 있었나"를 확인한다.
 
 ## Lab 30 — 액터에 붙인 소리가 액터와 함께 사라짐
@@ -554,7 +557,7 @@ void ABH_Blaster::Fire()
 UAudioComponent* Audio = UGameplayStatics::SpawnSoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation());
 Destroy();
 ```
-⚠️ 첫 인자에 `this`를 넘기면 **여전히 잘린다.** UE 5.8의 `SpawnSoundAtLocation`은 WorldContextObject의 액터를 컴포넌트의 주인(Outer)으로 삼기 때문이다(로그 경로가 `...BH_ExplosiveBarrel_0.AudioComponent_0`). `GetWorld()`를 넘기면 주인이 `WorldSettings`가 되어(`...WorldSettings_1.AudioComponent_0`) 통이 사라져도 끝까지 재생된다. 실제로 이 실수로 한 번 더 FAIL을 보고 찾은 함정이다.
+⚠️ 첫 인자에 `this`를 넘기면 **여전히 잘린다.** UE 5.8 엔진 소스에서 `SpawnSoundAtLocation`은 `GetActorOwnerFromWorldContextObject`로 WorldContextObject의 액터를 찾아 `FCreateComponentParams(World, Actor)`에 넘기고, 그 액터가 컴포넌트의 주인(Outer)이 되기 때문이다. 이전 엔진 버전(5.0~5.4)은 동작이 다를 수 있으니 로그의 컴포넌트 경로로 확인한다(로그 경로가 `...BH_ExplosiveBarrel_0.AudioComponent_0`). `GetWorld()`를 넘기면 주인이 `WorldSettings`가 되어(`...WorldSettings_1.AudioComponent_0`) 통이 사라져도 끝까지 재생된다. 실제로 이 실수로 한 번 더 FAIL을 보고 찾은 함정이다.
 (따라 움직여야 하는 소리라면: 액터를 바로 지우지 말고 숨기고 충돌을 끈 뒤 `SetLifeSpan(소리 길이)`.)
 **교훈:** 컴포넌트의 수명은 액터의 수명이다. "사라지면서 내는 소리·이펙트"는 액터에 붙이지 않는다. 같은 원리로 `SpawnEmitterAttached`/`SpawnSystemAttached`한 파티클도 잘린다. 참고: 엔진은 1초 이하의 짧은 소리를 들을 수 없는 위치에서 재생하면 컴포넌트를 아예 만들지 않는다(`au.SoundDistanceOptimizationLength`). 이 랩은 결과가 카메라 위치에 따라 흔들리지 않게 그 최적화를 끄고 검사한다.
 
@@ -662,7 +665,7 @@ FLinearColor ToMaterialColor(const FColor& Color)
 Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
 ```
 `AlwaysTickPose`도 통과한다(최적화는 덜 됨). 발자국이 애님 그래프의 시퀀스(로코모션)에서 나온다면 `OnlyTickMontagesWhenNotRendered`로는 부족하고 `AlwaysTickPose` 이상이 필요하다.
-**교훈:** "화면 밖에서만", "서버에서만", "헤드리스에서만" 안 일어나는 애니메이션 이벤트는 이 옵션부터 본다. 데디케이티드 서버는 아무것도 그리지 않으므로 서버의 공격 판정 노티파이가 통째로 사라진다. `ACharacter`의 메시 기본값은 `AlwaysTickPoseAndRefreshBones`인데, 최적화하면서 바꾼 값이 원인인 경우가 많다. 반대로 꼭 필요한 판정은 노티파이 대신 서버의 타이머나 게임 코드로 돌리는 것도 방법이다.
+**교훈:** "화면 밖에서만", "서버에서만", "헤드리스에서만" 안 일어나는 애니메이션 이벤트는 이 옵션부터 본다. 데디케이티드 서버는 아무것도 그리지 않으므로 서버의 공격 판정 노티파이가 통째로 사라진다. 스켈레탈 메시 컴포넌트의 기본값은 `AlwaysTickPoseAndRefreshBones`, `ACharacter`가 생성자에서 메시에 넣는 값은 `AlwaysTickPose`(UE 5.8 `Character.cpp`)인데, 최적화하면서 바꾼 값이 원인인 경우가 많다. 반대로 꼭 필요한 판정은 노티파이 대신 서버의 타이머나 게임 코드로 돌리는 것도 방법이다.
 
 ## Lab 36 — interrupted 로 끝난 이전 몽타주의 이벤트를 "완료"로 처리
 ```
@@ -796,7 +799,7 @@ void ABH_Passenger::RideElevator(ABH_Elevator* Elevator, float TargetHeight, flo
 }
 ```
 타이머로 0.05초마다 `bArrived`를 확인해도 된다. 이미 도착해 있을 수도 있다면 `if (Elevator->bArrived) Board(Elevator); else AddUObject(...)`.
-**교훈:** 게임 스레드 코드는 "기다리는" 코드를 쓰지 않는다. 기다릴 일은 델리게이트, 타이머, Tick, 잠재 액션(Delay 노드), 코루틴(UE5 의 `UE::Tasks`/`co_await` 계열)으로 "나중에 불러 달라"로 바꾼다. `Sleep`을 넣어도 CPU 사용률만 줄 뿐 굳는 것은 같다.
+**교훈:** 게임 스레드 코드는 "기다리는" 코드를 쓰지 않는다. 기다릴 일은 잠재 액션(`FPendingLatentAction`, 블루프린트의 Delay 노드), 타이머, 델리게이트, Tick, `UE::Tasks` 로 "나중에 불러 달라"로 바꾼다. `Sleep`을 넣어도 CPU 사용률만 줄 뿐 굳는 것은 같다.
 
 ## Lab 41 — 너비 우선 탐색의 방문 기록이 루프 한 바퀴만 산다
 ```

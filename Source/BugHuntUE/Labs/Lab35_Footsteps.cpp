@@ -86,8 +86,8 @@ void ABH_Lab35::StartLab()
 
 #pragma region 힌트 3
 // VisibilityBasedAnimTickOption 은 "화면에 안 그려지면 애니메이션을 얼마나 아낄지" 입니다.
-//     AlwaysTickPoseAndRefreshBones  항상 진행 + 본 갱신 (ACharacter 의 기본값)
-//     AlwaysTickPose                 항상 진행, 본 갱신은 보일 때만 (스켈레탈 메시 컴포넌트 기본값)
+//     AlwaysTickPoseAndRefreshBones  항상 진행 + 본 갱신 (스켈레탈 메시 컴포넌트 기본값)
+//     AlwaysTickPose                 항상 진행, 본 갱신은 보일 때만 (ACharacter 가 생성자에서 메시에 넣는 값)
 //     OnlyTickMontagesWhenNotRendered 안 보이면 몽타주만 진행 (몽타주 노티파이는 나옴)
 //     OnlyTickPoseWhenRendered       안 보이면 아무것도 진행 안 함 → 노티파이, 몽타주 종료 이벤트 전부 멈춤
 // 게임 판정(발소리 감지, 공격 판정)에 쓰는 노티파이가 있다면 서버와 화면 밖에서도 진행되어야 합니다.

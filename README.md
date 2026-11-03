@@ -104,10 +104,10 @@
 4. 결과는 화면 왼쪽 위와 **Output Log**(메뉴 Window → Output Log)에 나옵니다. Output Log 검색창에 `LogBugHunt`를 넣으면 랩 결과만 보입니다.
 
 ```
-LogBugHunt: ==== 랩 5: 전투 기록 창 ====
-LogBugHunt: [FAIL] 다시 연 창의 기록 줄 수 (기대: 1, 실제: 2)
-LogBugHunt: [PASS] 기사 HP (값: 78)
-LogBugHunt: ==== 랩 5 결과: PASS 1 / FAIL 2 ====
+LogBugHunt: Display: ==== 랩 5: 전투 기록 창 ====
+LogBugHunt: Display: [FAIL] 다시 연 창의 기록 줄 수 (기대: 1, 실제: 2)
+LogBugHunt: Display: [PASS] 기사 HP (값: 78)
+LogBugHunt: Display: ==== 랩 5 결과: PASS 1 / FAIL 2 ====
 ```
 
 **같은 랩을 계속 돌릴 때 (콘솔판의 "명령 인수"와 같은 방법)**: 솔루션 탐색기에서 BugHuntUE 우클릭 → 속성 → 디버깅 → **명령 인수**를
@@ -439,6 +439,7 @@ Block 과 Overlap 규칙: 두 물체의 서로에 대한 응답 중 **약한 쪽
 | 30 | 폭발 통 | 폭발음이 터지자마자 끊긴다 | `SpawnSoundAttached` 컴포넌트의 수명 = 액터의 수명, `au.Debug.Sounds` | ★ |
 | 31 | 경보 종 | 리슨 서버 호스트만 종소리를 듣는다 | 소리는 **복제되지 않는다**, 연출용 NetMulticast | ★★ |
 
+- 랩 29는 발사음(`/Engine/EditorSounds/Notifications/CompileFailed`)이 이미 메모리에 있으면 재현되지 않습니다. 이 소리는 에디터 알림음이라, 에디터에서 컴파일이 실패해 알림음이 울린 직후라면 에디터를 다시 켜고 실행하세요(`obj list class=SoundWave` 로 확인). 채점기와 `-game` 실행에서는 늘 재현됩니다.
 - 랩 30은 오디오 장치가 필요합니다. `-nosound`로 실행했거나 출력 장치가 없으면 `[SKIP]`이 나옵니다.
 - 랩 31은 랩 38·39처럼 **Number of Players 2, Play As Listen Server**로 실행하고 서버 창에서 `BugHunt.Lab 31`. 실행하기 전에 볼륨을 낮추세요(이 부의 랩은 소리를 냅니다).
 
@@ -542,7 +543,7 @@ Block 과 Overlap 규칙: 두 물체의 서로에 대한 응답 중 **약한 쪽
 진짜로 굳으면 에디터를 강제 종료해야 하므로, 멈춤 랩(40, 41, 44)의 루프와 대기에는 **시간 예산**이 붙어 있습니다(`Core/BugHuntHang.h`, 버그 없음).
 
 ```
-LogBugHunt: [FAIL] 응답 없음 (2003 ms / 213회 초과) - 엘리베이터 기다리기
+LogBugHunt: Display: [FAIL] 응답 없음 (2003 ms / 213회 초과) - 엘리베이터 기다리기
 ```
 
 - 예산(기본 **2초**)을 넘기면 위 줄을 찍고 그 루프나 대기에서 **빠져나옵니다**. 그 뒤 코드는 버그가 만든 상태 그대로 계속 돕니다. 채점기는 이 랩을 TIMEOUT 으로 매깁니다.
@@ -733,7 +734,7 @@ Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바�
 | `-BugHuntLab=N` | 월드가 시작되면 랩 N 자동 실행 |
 | `-BugHuntExit` | 랩이 끝나면 종료 (자동 검증용) |
 | `-BugHuntSeed=S` | 숨은 입력(시드 S)으로 실행 (채점기가 쓴다) |
-| `-stomp2malloc` | 해제된 메모리/범위 밖 접근을 그 자리에서 잡는 할당기 (언리얼판 ASan, 에디터 빌드 전용). 아주 느리고 메모리를 많이 씀. `-MallocStomp2MinSize=`, `-MallocStomp2MaxSize=`로 크기 범위를 좁힐 수 있음 |
+| `-stomp2malloc` | 해제된 메모리/범위 밖 접근을 그 자리에서 잡는 할당기 (언리얼판 ASan. UE 5.8 기본으로는 **Windows 에디터 빌드 전용**: `MallocStomp2.h` 의 `WITH_MALLOC_STOMP2 = WITH_EDITOR && PLATFORM_WINDOWS`. 게임 빌드에서는 명령줄을 줘도 아무 일도 없다). 아주 느리고 메모리를 많이 씀. `-MallocStomp2MinSize=`, `-MallocStomp2MaxSize=`로 크기 범위를 좁힐 수 있음 |
 | `-log` | 별도 로그 창 띄우기 |
 
 ## 다시 풀고 싶을 때
