@@ -1,3 +1,6 @@
+// [주의] 이 랩은 소리를 냅니다. 실행 전에 시스템 볼륨을 낮추고, 헤드폰을 쓴다면 귀에서 떼고 시작하세요.
+//        (실습용 소리는 볼륨 배율 0.5 로 재생합니다.)
+
 #include "Labs/Lab13_FireSound.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
@@ -35,7 +38,7 @@ void ABH_Blaster::Fire()
 
 void ABH_Blaster::PlayFireSound(USoundBase* Sound, uint64 FireFrame, double FireTime)
 {
-	UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation());
+	UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), /*VolumeMultiplier*/ 0.5f);
 
 	const int32 Frames = static_cast<int32>(GFrameCounter - FireFrame);
 	const float Ms = static_cast<float>((FPlatformTime::Seconds() - FireTime) * 1000.0);
@@ -46,6 +49,7 @@ void ABH_Blaster::PlayFireSound(USoundBase* Sound, uint64 FireFrame, double Fire
 
 void ABH_Lab13::StartLab()
 {
+	BugHunt::Note(TEXT("[주의] 소리가 납니다. 볼륨을 낮추세요."));
 	ABH_Blaster* Blaster = SpawnLabActor<ABH_Blaster>();
 	BugHunt::Note(TEXT("블래스터를 세 번 쏜다. 두 번째와 세 번째 사이에 레벨 전환 등으로 GC가 돈다."));
 

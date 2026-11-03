@@ -1,3 +1,6 @@
+// [주의] 이 랩은 소리를 냅니다. 실행 전에 시스템 볼륨을 낮추고, 헤드폰을 쓴다면 귀에서 떼고 시작하세요.
+//        (실습용 소리는 볼륨 배율 0.5 로 재생합니다.)
+
 #include "Labs/Lab14_Explosion.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
@@ -21,12 +24,17 @@ UAudioComponent* ABH_ExplosiveBarrel::Explode()
 {
 	UE_LOG(LogBugHunt, Log, TEXT("  %s 폭발!"), *GetName());
 	UAudioComponent* Audio = UGameplayStatics::SpawnSoundAttached(ExplosionSound, RootComponent);
+	if (Audio)
+	{
+		Audio->SetVolumeMultiplier(0.5f);   // (실습용: 소리를 줄여 둠. 버그와 상관없음)
+	}
 	Destroy();
 	return Audio;
 }
 
 void ABH_Lab14::StartLab()
 {
+	BugHunt::Note(TEXT("[주의] 소리가 납니다. 볼륨을 낮추세요."));
 	ABH_ExplosiveBarrel* Barrel = SpawnLabActor<ABH_ExplosiveBarrel>(FVector(300.f, 0.f, 50.f));
 
 	const bool bHasAudio = GEngine && GEngine->UseSound() && GetWorld()->GetAudioDeviceRaw() != nullptr;

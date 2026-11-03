@@ -1,3 +1,6 @@
+// [주의] 이 랩은 소리를 냅니다. 실행 전에 시스템 볼륨을 낮추고, 헤드폰을 쓴다면 귀에서 떼고 시작하세요.
+//        (실습용 소리는 볼륨 배율 0.5 로 재생합니다.)
+
 #include "Labs/Lab15_AlarmBell.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
@@ -22,7 +25,7 @@ void ABH_AlarmBell::Ring()
 
 void ABH_AlarmBell::PlayRingSound()
 {
-	UGameplayStatics::PlaySoundAtLocation(this, RingSound, GetActorLocation());
+	UGameplayStatics::PlaySoundAtLocation(this, RingSound, GetActorLocation(), /*VolumeMultiplier*/ 0.5f);
 	++RingsHeard;
 	UE_LOG(LogBugHunt, Log, TEXT("  %s 땡! (%d번째)"), *BugHunt::NetTag(this), RingsHeard);
 }
@@ -41,6 +44,7 @@ void ABH_AlarmBell::Multicast_CheckHeard_Implementation(int32 ExpectedRings)
 
 void ABH_Lab15::StartLab()
 {
+	BugHunt::Note(TEXT("[주의] 소리가 납니다. 볼륨을 낮추세요."));
 	if (GetNetMode() == NM_Client)
 	{
 		BugHunt::Skip(TEXT("랩 15"), TEXT("서버(리슨 서버 창)에서 실행하세요."));
