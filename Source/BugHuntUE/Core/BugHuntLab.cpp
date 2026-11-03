@@ -1,4 +1,5 @@
 #include "Core/BugHuntLab.h"
+#include "Core/BugHuntCase.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 #include "EngineUtils.h"
@@ -17,7 +18,12 @@ void ABugHuntLab::BeginLab(int32 InLabNumber, const FString& InTitle)
 	LabNumber = InLabNumber;
 	LabTitle = InTitle;
 	BugHunt::ResetTally();
+	BugHunt::ResetCase();
 	BugHunt::Print(FString::Printf(TEXT("==== 랩 %d: %s ===="), LabNumber, *LabTitle), FColor::Cyan);
+	if (BugHunt::IsHiddenCase())
+	{
+		BugHunt::Note(FString::Printf(TEXT("숨은 입력 (시드 %d). 지원하는 랩은 공개 입력과 다른 값으로 돈다."), BugHunt::CaseSeed()));
+	}
 	StartLab();
 }
 

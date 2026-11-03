@@ -477,3 +477,88 @@ void ABH_Knight::OnAnimStateEnd(FName EventName)   { bHitboxOn = false; }
 검증 로그: 경직 프레임 바로 다음 프레임에 `HitWindow 끝 → 끔`. 노티파이 스테이트는 시작한 것이 사라지면(끊김, 정지, 다른 몽타주) 엔진이 `NotifyEnd`를 불러 준다. 헤더를 바꿨으므로 Live Coding이 아니라 에디터를 닫고 빌드해야 한다.
 또 다른 방법: `OnMontageBlendingOut`/`OnMontageEnded`에서 히트박스를 끄는 안전장치(이 랩에서는 검증하지 않았다).
 **교훈:** "켜고 → 끈다"처럼 구간에 걸친 상태를 서로 다른 시각의 두 이벤트에 맡기면, 중간에 끊기는 순간 끄는 쪽이 사라진다. 사망, 피격, 회피, 렉으로 프레임이 크게 뛸 때 재현된다. 구간 = 노티파이 스테이트, 그리고 상태를 켜는 코드에는 항상 "끊겼을 때 끄는 길"을 같이 만든다.
+
+# 7부: 잘못된 포인터
+
+## Lab 22 — UObject 가 아닌 곳에 raw 포인터로 액터를 기억함
+```
+틀린 결과:     Bram 의 어그로 60 FAIL (기대 10). 보스가 노리는 대상 Bram FAIL (기대 Lia)
+멈춘 위치:     Kael->Destroy() 줄에서 조사식 Kael = 0x00000xxxxxxx 를 적음 → Bram 스폰 뒤 Bram 의 주소가 똑같다
+               ThreatTable.Threat 에 키가 2개뿐: (Kael 이 쓰던 주소 = 지금의 Bram) 60, Lia 30
+진짜 원인:     FBH_ThreatTable 은 보통 C++ 구조체라 UPROPERTY 를 못 단다. 그래서 AActor* 로 키를 잡았다.
+               GC 가 Kael 의 메모리를 돌려주자 같은 크기의 Bram 이 그 자리에 생겼고, 표는 주소만 보고 Bram 을 Kael 로 착각했다 (ABA).
+               주소가 재사용되지 않았다면: 표에 지워진 메모리를 가리키는 키(50)가 남아 TopTarget 이 그것을 고른다.
+```
+**수정:**
+```cpp
+// Lab22_ThreatTable.h
+TMap<TWeakObjectPtr<AActor>, int32> Threat;
+
+// Lab22_ThreatTable.cpp — TopTarget
+for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair : Threat)
+{
+    if (Pair.Key.IsValid() && Pair.Value > BestThreat)
+    {
+        Best = Pair.Key.Get();
+        BestThreat = Pair.Value;
+    }
+}
+```
+`AddThreat`/`ThreatOf`는 그대로 둬도 된다 (`AActor*`가 `TWeakObjectPtr`로 바뀌어 찾는다). 죽은 키를 가끔 지우고 싶으면 `Threat.Remove(nullptr)` 대신 `for (auto It = Threat.CreateIterator(); It; ++It) if (!It.Key().IsValid()) It.RemoveCurrent();`.
+**교훈:** 랩 4(UPROPERTY 없는 멤버)는 "GC 가 모르는 참조라서 **지워진다**"였고, 이 랩은 "지워지는 게 맞는데 **지워진 줄 모른다**"다. UObject 를 UObject 가 아닌 곳(보통 구조체, 람다, 다른 스레드, Slate 위젯, 전역 캐시)에서 기억하려면 `TWeakObjectPtr`. 객체를 살려 둬야 한다면 `TStrongObjectPtr`이나 `FGCObject`(AddReferencedObjects)로 GC 에 알린다. raw 포인터의 "주소가 같다"는 "같은 객체다"가 아니다.
+
+## Lab 23 — 타이머 람다가 this 를 캡처했지만 객체에 묶이지 않음
+```
+틀린 결과:     표적이 맞은 횟수 7 FAIL (기대 2). "포탑 파괴!" 뒤에도 발사 3, 4, 5... 가 찍힌다
+멈춘 위치:     Fire 조건부 중단점 (ShotsFired >= 3) → 호출 스택 FTimerManager::Tick → 람다 → Fire
+               조사식 this->bActorIsBeingDestroyed = true (이미 파괴된 포탑)
+진짜 원인:     FTimerDelegate::CreateLambda 는 어떤 UObject 에도 묶이지 않는다. 액터의 EndPlay 는 그 액터에 묶인
+               타이머만 지운다 (ClearAllTimersForObject). 람다 안의 this 는 그냥 주소다.
+```
+**수정 (택1):**
+```cpp
+GetWorldTimerManager().SetTimer(FireTimer, FTimerDelegate::CreateWeakLambda(this, [this] { Fire(); }), InInterval, true);
+GetWorldTimerManager().SetTimer(FireTimer, FTimerDelegate::CreateUObject(this, &ABH_Turret::Fire), InInterval, true);
+GetWorldTimerManager().SetTimer(FireTimer, this, &ABH_Turret::Fire, InInterval, true);
+```
+보조 수단: `EndPlay`에서 `GetWorldTimerManager().ClearTimer(FireTimer)`.
+**교훈:** 델리게이트·타이머·비동기 콜백에 `[this]`를 넘길 때는 "이 객체가 먼저 사라지면?"을 묻는다. `CreateLambda`/`AddLambda` + `[this]`는 C++ 의 댕글링 포인터와 똑같다. 지금은 GC 전이라 "쏘기만" 했지만, GC 가 돈 뒤였다면 랩 4 처럼 해제된 메모리를 읽는다. 언리얼의 답은 `CreateUObject`, `CreateWeakLambda`, `AddUObject`, `AddWeakLambda`(UObject), `CreateSP`/`CreateSPLambda`(TSharedFromThis).
+
+## Lab 24 — 배열 원소 참조를 든 채로 Add (재할당)
+```
+기록표:        물약 4 (Gem 새 칸, 4칸) → 3 → 2 (Herb 새 칸, 5칸: 인라인 4칸을 넘어 힙으로 이사) → "1"
+틀린 결과:     남은 물약 2 FAIL (기대 1). 로그에는 1 로 찍히는데 진짜 칸은 2
+멈춘 위치:     조사식 &Potions 와 &Slots[0] 이 Herb 를 넣기 전엔 같고, 넣은 뒤엔 다르다
+               데이터 중단점 &Slots[0].Count → 마지막 웨이브에서 안 걸린다 (아무도 진짜 칸을 안 바꿈)
+진짜 원인:     FBH_BeltSlot& Potions 는 "그 순간의 메모리 위치"를 가리킨다. Add 가 배열을 새 메모리로 옮기자 옛 위치에 쓰게 됐다.
+```
+**수정:**
+```cpp
+const int32 PotionIndex = FindSlot(Potion);
+for (const FName& Drop : Drops)
+{
+    Slots[PotionIndex].Count -= 1;
+    AddItem(Drop, 1);
+}
+```
+`Slots.Reserve(...)`로 미리 공간을 잡아도 이번에는 통과하지만, "몇 칸이면 충분한가"를 코드가 장담할 수 없으면 근본 해결이 아니다.
+**교훈:** `TArray`의 `Add`, `Emplace`, `Insert`, `SetNum`, `Reserve`, `Append`는 원소를 옮길 수 있다. 그 전에 꺼낸 참조, 포인터, `GetData()`는 무효다. 기본 할당자라면 옛 위치는 **해제된 힙**이라 가끔 죽거나 남의 데이터를 망가뜨리고(-stomp2malloc 으로 잡힌다), `TInlineAllocator`는 옛 위치가 살아 있어서 **죽지도 않고 값만 사라진다**. `TMap`/`TSet`의 `FindOrAdd`/`Add`도 같다 (`Find`로 얻은 포인터는 다음 `Add` 전까지만).
+
+## Lab 25 — TSharedPtr 순환 참조
+```
+틀린 결과:     대화가 끝난 뒤 남은 노드 7 FAIL (기대 0). 소멸자 중단점이 한 번도 안 걸린다
+멈춘 위치:     EndConversation 의 Root.Reset() 직전 조사식 Root → 참조 수 4 (Root 멤버 하나 + 선택지 3개의 Parent. Current 는 바로 앞 줄에서 Reset)
+진짜 원인:     부모 → 자식(Choices)과 자식 → 부모(Parent)를 둘 다 TSharedPtr 로 잡았다. 고리 안의 참조 수는 0 이 되지 않는다.
+```
+**수정:**
+```cpp
+// Lab25_DialogueTree.h
+TWeakPtr<FBH_DialogueNode> Parent;
+
+// Lab25_DialogueTree.cpp — GoBack
+if (TSharedPtr<FBH_DialogueNode> Up = Current ? Current->Parent.Pin() : nullptr)
+{
+    Current = Up;
+}
+```
+**교훈:** `TSharedPtr`는 참조 수만 센다. GC 처럼 "아무도 안 닿는 고리"를 찾아 주지 않는다. 소유 방향 하나만 `TSharedPtr`/`TSharedRef`, 거꾸로 가리키는 쪽(부모, 소유자, 리스너)은 `TWeakPtr`. 크래시도 경고도 없어서 `stat memory`, `memreport -full`, LLM(`-llm`)에서 "계속 느는 숫자"로 발견되곤 한다. 이 랩처럼 생성/소멸 카운터를 두면 바로 보인다.

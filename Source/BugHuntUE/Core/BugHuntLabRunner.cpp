@@ -1,12 +1,15 @@
 // 콘솔 명령:
 //   BugHunt.List      랩 목록
 //   BugHunt.Lab N     랩 N 실행 (PIE 또는 -game 실행 중에)
+//   BugHunt.Lab N S   랩 N을 숨은 입력(시드 S)으로 실행. S가 0이면 공개 입력
 // 명령줄:
 //   -BugHuntLab=N     월드가 시작되면 랩 N을 자동 실행
 //   -BugHuntExit      랩이 끝나면 종료 (자동 검증용)
+//   -BugHuntSeed=S    숨은 입력(시드 S)으로 실행 (채점기가 쓴다)
 
 #include "Core/BugHuntLabRunner.h"
 #include "BugHuntUE.h"
+#include "Core/BugHuntCase.h"
 #include "Core/BugHuntLab.h"
 #include "Core/BugHuntReport.h"
 #include "Engine/Engine.h"
@@ -37,6 +40,10 @@
 #include "Labs/Lab19_Footsteps.h"
 #include "Labs/Lab20_ComboSwing.h"
 #include "Labs/Lab21_HitWindow.h"
+#include "Labs/Lab22_ThreatTable.h"
+#include "Labs/Lab23_Turret.h"
+#include "Labs/Lab24_PotionBelt.h"
+#include "Labs/Lab25_DialogueTree.h"
 
 namespace
 {
@@ -75,6 +82,11 @@ const FLabEntry GLabs[] = {
 	{ TEXT("발자국"),        TEXT("카메라 밖 NPC의 발소리를 적이 못 듣는다"),     [] { return ABH_Lab19::StaticClass(); } },
 	{ TEXT("연타 콤보"),     TEXT("연타하면 공격 중인데 움직여지고 콤보가 더 오른다"), [] { return ABH_Lab20::StaticClass(); } },
 	{ TEXT("히트박스"),      TEXT("공격이 끊긴 뒤에도 칼에 닿으면 맞는다"),       [] { return ABH_Lab21::StaticClass(); } },
+	// 7부: 잘못된 포인터
+	{ TEXT("어그로 표"),     TEXT("새로 온 영웅이 죽은 영웅의 어그로를 물려받는다"), [] { return ABH_Lab22::StaticClass(); } },
+	{ TEXT("포탑"),          TEXT("부순 포탑이 계속 쏜다"),                       [] { return ABH_Lab23::StaticClass(); } },
+	{ TEXT("물약 벨트"),     TEXT("전리품을 주운 뒤로 물약이 줄지 않는다"),       [] { return ABH_Lab24::StaticClass(); } },
+	{ TEXT("대화 트리"),     TEXT("대화가 끝나도 대화 노드가 메모리에 남는다"),   [] { return ABH_Lab25::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
@@ -87,7 +99,7 @@ void ListLabs()
 	}
 }
 
-void RunLabImpl(UWorld* World, int32 Number)
+void RunLabImpl(UWorld* World, int32 Number, int32 Seed)
 {
 	if (Number < 1 || Number > GLabCount)
 	{
@@ -107,6 +119,10 @@ void RunLabImpl(UWorld* World, int32 Number)
 		It->Destroy();
 	}
 
+	if (Seed >= 0)
+	{
+		BugHunt::SetCaseSeed(Seed);
+	}
 	const FLabEntry& Entry = GLabs[Number - 1];
 	FActorSpawnParameters Params;
 	Params.Name = MakeUniqueObjectName(World->GetCurrentLevel(), Entry.GetClass(), *FString::Printf(TEXT("BugHuntLab%02d"), Number));
@@ -116,7 +132,7 @@ void RunLabImpl(UWorld* World, int32 Number)
 
 FAutoConsoleCommandWithWorldAndArgs GLabCommand(
 	TEXT("BugHunt.Lab"),
-	TEXT("BugHunt.Lab N : 랩 N을 실행한다. (PIE 중에 입력)"),
+	TEXT("BugHunt.Lab N [시드] : 랩 N을 실행한다. (PIE 중에 입력) 시드를 주면 채점기처럼 숨은 입력으로, 0이면 공개 입력으로 돈다."),
 	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 	{
 		if (Args.Num() < 1)
@@ -124,7 +140,7 @@ FAutoConsoleCommandWithWorldAndArgs GLabCommand(
 			ListLabs();
 			return;
 		}
-		RunLabImpl(World, FCString::Atoi(*Args[0]));
+		RunLabImpl(World, FCString::Atoi(*Args[0]), Args.Num() >= 2 ? FCString::Atoi(*Args[1]) : INDEX_NONE);
 	}));
 
 FAutoConsoleCommand GListCommand(
@@ -135,7 +151,7 @@ FAutoConsoleCommand GListCommand(
 
 void BugHunt::RunLab(UWorld* World, int32 Number)
 {
-	RunLabImpl(World, Number);
+	RunLabImpl(World, Number, INDEX_NONE);
 }
 
 bool UBugHuntAutoRunSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
