@@ -410,3 +410,70 @@ FLinearColor ToMaterialColor(const FColor& Color)
 }
 ```
 **교훈:** 0과 1(0x00, 0xFF)은 감마 변환해도 그대로라서 순수한 빨강·검정으로만 테스트하면 이 버그를 못 잡는다. 중간값(0x80)을 꼭 넣는다. "물 빠지고 밝다" = Linear 자리에 sRGB 값, "너무 어둡고 진하다" = 그 반대. 텍스처라면 같은 문제가 sRGB 체크박스로 나타난다(색 텍스처 켬, 노멀·마스크·러프니스 끔). 엔진 함수 이름: `FLinearColor(FColor)`/`FromSRGBColor`는 변환, `FColor::ReinterpretAsLinear`는 변환 없음, `ToFColor(true)`/`ToFColorSRGB`는 Linear → sRGB.
+
+# 6부: 애니메이션
+
+## Lab 19 — 렌더되지 않으면 애니메이션이 진행되지 않음
+```
+틀린 결과:     발자국 0번 FAIL (기대 4). 재생 시간이 지났는데 "몽타주 아직 재생 중: 예, 위치 0.00초"
+멈춘 위치:     OnAnimEvent 중단점에 한 번도 안 멈춤 → 조사식 Walker->Mesh->ShouldTickPose() = false, bRecentlyRendered = false
+진짜 원인:     생성자의 VisibilityBasedAnimTickOption = OnlyTickPoseWhenRendered. 최근 1초 안에 그려지지 않은 메시는 TickPose 를 건너뛴다.
+               포즈가 진행되지 않으니 몽타주 위치가 0에 멈추고, 노티파이도 종료 이벤트도 오지 않는다.
+```
+**수정:**
+```cpp
+// 안 보일 때도 몽타주(와 몽타주 노티파이)는 진행, 나머지 애님 그래프는 아낀다.
+Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMontagesWhenNotRendered;
+```
+`AlwaysTickPose`도 통과한다(최적화는 덜 됨). 발자국이 애님 그래프의 시퀀스(로코모션)에서 나온다면 `OnlyTickMontagesWhenNotRendered`로는 부족하고 `AlwaysTickPose` 이상이 필요하다.
+**교훈:** "화면 밖에서만", "서버에서만", "헤드리스에서만" 안 일어나는 애니메이션 이벤트는 이 옵션부터 본다. 데디케이티드 서버는 아무것도 그리지 않으므로 서버의 공격 판정 노티파이가 통째로 사라진다. `ACharacter`의 메시 기본값은 `AlwaysTickPoseAndRefreshBones`인데, 최적화하면서 바꾼 값이 원인인 경우가 많다. 반대로 꼭 필요한 판정은 노티파이 대신 서버의 타이머나 게임 코드로 돌리는 것도 방법이다.
+
+## Lab 20 — interrupted 로 끝난 이전 몽타주의 이벤트를 "완료"로 처리
+```
+기록표:        프레임 0    공격 → 휘두르기 시작
+               (0.3초)     공격 → 휘두르기 시작      ← 같은 몽타주 다시 재생, 이전 인스턴스는 블렌드 아웃
+               (0.55초쯤)  휘두르기 끝 → 콤보 +1     ← bInterrupted == true, 이전 인스턴스가 사라짐
+               (2.1초쯤)   휘두르기 끝 → 콤보 +1     ← bInterrupted == false, 진짜 끝
+틀린 결과:     두 번째 휘두르기 도중 bAttacking == false FAIL, 콤보 2 FAIL (기대 1)
+멈춘 위치:     HandleMontageEnded 첫 번째 멈춤 → 지역 창 bInterrupted = true
+진짜 원인:     OnMontageEnded 는 몽타주 인스턴스가 사라질 때마다 불린다. 이유(끝까지 재생 / 밀려남 / Stop)를 무시했다.
+```
+**수정:**
+```cpp
+void ABH_Swordsman::HandleMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+    if (Montage != SwingMontage || bInterrupted)
+    {
+        return;     // 밀려난 이전 휘두르기. 지금 휘두르는 중인 새 인스턴스가 상태를 책임진다.
+    }
+    bAttacking = false;
+    ++CompletedSwings;
+}
+```
+주의: 이렇게만 하면 **다른 몽타주(회피, 피격)에 밀려난** 경우에도 `bAttacking`이 true로 남는다. 실제 게임이라면 interrupted 일 때는 콤보는 올리지 않고, `bAttacking`은 "지금도 이 몽타주가 재생 중인가"(`!GetAnim()->Montage_IsPlaying(SwingMontage)`)로 정한다. 또는 `Montage_Play` 직후 `Montage_SetEndDelegate`로 **이번 인스턴스 전용** 델리게이트를 건다.
+**교훈:** 몽타주 종료 이벤트는 "끝났다"가 아니라 "사라졌다"다. 연타·캔슬이 있는 공격은 이전 인스턴스의 종료 이벤트가 **새 인스턴스가 재생되는 도중에** 도착한다. 블렌드 아웃 시간만큼 늦게 오기 때문에 테스트에서 놓치기 쉽다.
+
+## Lab 21 — 켜고 끄는 일을 노티파이 두 개에 나눠 맡김
+```
+기록표:        0.55초 HitOn → 히트박스 켬
+               0.82초 맞음 → 경직, Montage_Stop(0.1)
+               (1.10초 HitOff 는 몽타주가 그 전에 멈춰서 영영 오지 않음)
+틀린 결과:     경직 1초 뒤 bHitboxOn == true FAIL
+멈춘 위치:     OnAnimEvent 중단점이 경직 뒤로는 안 멈춤. 몽타주 재생 중: 아니오
+진짜 원인:     노티파이는 몽타주가 그 시각을 지나갈 때만 온다. 끝을 알리는 노티파이는 몽타주가 끊기면 오지 않는다.
+```
+**수정 (검증한 것): 구간을 노티파이 스테이트 하나로**
+```cpp
+// Lab21_HitWindow.h
+virtual void OnAnimStateBegin(FName EventName) override;
+virtual void OnAnimStateEnd(FName EventName) override;
+
+// Lab21_HitWindow.cpp — BeginPlay
+BugHunt::AddNotify(SlashMontage, Length * 0.3f, TEXT("HitWindow"), Length * 0.3f);   // [30%, 60%] 스테이트
+
+void ABH_Knight::OnAnimStateBegin(FName EventName) { bHitboxOn = true; }
+void ABH_Knight::OnAnimStateEnd(FName EventName)   { bHitboxOn = false; }
+```
+검증 로그: 경직 프레임 바로 다음 프레임에 `HitWindow 끝 → 끔`. 노티파이 스테이트는 시작한 것이 사라지면(끊김, 정지, 다른 몽타주) 엔진이 `NotifyEnd`를 불러 준다. 헤더를 바꿨으므로 Live Coding이 아니라 에디터를 닫고 빌드해야 한다.
+또 다른 방법: `OnMontageBlendingOut`/`OnMontageEnded`에서 히트박스를 끄는 안전장치(이 랩에서는 검증하지 않았다).
+**교훈:** "켜고 → 끈다"처럼 구간에 걸친 상태를 서로 다른 시각의 두 이벤트에 맡기면, 중간에 끊기는 순간 끄는 쪽이 사라진다. 사망, 피격, 회피, 렉으로 프레임이 크게 뛸 때 재현된다. 구간 = 노티파이 스테이트, 그리고 상태를 켜는 코드에는 항상 "끊겼을 때 끄는 길"을 같이 만든다.

@@ -34,6 +34,9 @@
 #include "Labs/Lab16_Highlight.h"
 #include "Labs/Lab17_ItemIcons.h"
 #include "Labs/Lab18_TeamColor.h"
+#include "Labs/Lab19_Footsteps.h"
+#include "Labs/Lab20_ComboSwing.h"
+#include "Labs/Lab21_HitWindow.h"
 
 namespace
 {
@@ -68,6 +71,10 @@ const FLabEntry GLabs[] = {
 	{ TEXT("상자 강조"),     TEXT("마우스를 올려도 상자가 빨개지지 않는다"),     [] { return ABH_Lab16::StaticClass(); } },
 	{ TEXT("인벤토리 아이콘"), TEXT("스크롤하면 엉뚱한 아이템 아이콘이 뜬다"),   [] { return ABH_Lab17::StaticClass(); } },
 	{ TEXT("팀 색"),         TEXT("팀 색이 기획서보다 밝고 물 빠져 보인다"),     [] { return ABH_Lab18::StaticClass(); } },
+	// 6부: 애니메이션
+	{ TEXT("발자국"),        TEXT("카메라 밖 NPC의 발소리를 적이 못 듣는다"),     [] { return ABH_Lab19::StaticClass(); } },
+	{ TEXT("연타 콤보"),     TEXT("연타하면 공격 중인데 움직여지고 콤보가 더 오른다"), [] { return ABH_Lab20::StaticClass(); } },
+	{ TEXT("히트박스"),      TEXT("공격이 끊긴 뒤에도 칼에 닿으면 맞는다"),       [] { return ABH_Lab21::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
