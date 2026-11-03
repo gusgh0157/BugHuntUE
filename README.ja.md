@@ -2,7 +2,7 @@
 
 [한국어](README.md) | **日本語**
 
-> 注: ラボの実行出力と採点ツールのメッセージは、コマンドライン `-BugHuntLang=ja`(採点は `grade.bat -BugHuntLang=ja`)、コンソール変数 `BugHunt.Lang ja`、エディター/OS の言語が日本語、のいずれか (この優先順) で日本語になります。それ以外は韓国語です。
+> 注: ラボの実行出力と採点ツールのメッセージは、コマンドライン `-BugHuntLang=ja`(採点は `grade.bat -BugHuntLang=ja`)、コンソール変数 `BugHunt.Lang ja`、エディター/OS の言語が日本語、のいずれかで日本語になります (実行中にコンソールで変えた値が最優先、次にコマンドライン、最後にエディター/OS の言語)。それ以外は韓国語です。
 
 [BugHunt](https://github.com/gusgh0157/BugHunt)(C++ コンソール版)の Unreal Engine 版です。
 バグが**わざと仕込まれた**小さなゲームコードの集まりで、今回は **Unreal でしか起きない**バグを集めています。
@@ -729,7 +729,7 @@ grade.bat
 | `stat fps` / `stat unit` / `stat game` | フレーム、スレッドごとの ms、Tick の時間 |
 | `log カテゴリー Verbose` | そのカテゴリーのログの詳細度を上げる |
 | `showdebug` | 画面にデバッグ情報 (カメラ、入力など) |
-| `BugHunt.Lang ja` | ラボの出力言語 (`ko` / `ja`)。空にするとエディター/OS の言語。コマンドラインの `-BugHuntLang=` が優先 |
+| `BugHunt.Lang ko` / `BugHunt.Lang ja` | ラボ・採点ツールの出力言語を実行中に切り替える。値が空（既定）ならエディター/OS の言語に従う |
 
 ## コマンドラインオプション
 
@@ -741,7 +741,7 @@ grade.bat
 | `-BugHuntSeed=S` | 隠し入力(シード S)で実行 (採点ツールが使う) |
 | `-stomp2malloc` | 解放されたメモリ/範囲外へのアクセスをその場で捕まえるアロケーター (Unreal 版の ASan。UE 5.8 のデフォルトでは **Windows のエディタービルド専用**: `MallocStomp2.h` の `WITH_MALLOC_STOMP2 = WITH_EDITOR && PLATFORM_WINDOWS`。ゲームビルドではコマンドラインで指定しても何も起きない)。とても遅く、メモリを大量に使う。`-MallocStomp2MinSize=`、`-MallocStomp2MaxSize=` でサイズの範囲を絞れる |
 | `-log` | 別のログウィンドウを開く |
-| `-BugHuntLang=ko\|ja` | ラボの出力と採点ツールのメッセージの言語。`grade.bat -BugHuntLang=ja` も同じ |
+| `-BugHuntLang=ko` / `-BugHuntLang=ja` | ラボ・採点ツールの出力言語（`grade.bat -BugHuntLang=ja` も同じ）。決まる順: `BugHunt.Lang` の値（このオプションが入れ、実行中にコンソールで変えるとその値）→ エディター/OS の言語 → 韓国語。ヘッドレス採点でも同じ出力になるよう、LOCTEXT ではなくソース内の韓国語／日本語の表（`Core/BugHuntText.h`）を使う。`grade-report.json` のキーと `result` は言語に関係なく同じで、`title`/`detail` だけが変わる |
 
 ## もう一度解きたいとき
 

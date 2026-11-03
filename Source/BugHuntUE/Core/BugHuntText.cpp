@@ -12,7 +12,7 @@ namespace
 TAutoConsoleVariable<FString> CVarLang(
 	TEXT("BugHunt.Lang"),
 	TEXT(""),
-	TEXT("랩 출력 언어: ko 또는 ja. 비우면 에디터/OS 언어. 명령줄 -BugHuntLang= 이 먼저. / ラボ出力の言語: ko または ja。空ならエディター／OS の言語。コマンドライン -BugHuntLang= が優先。"));
+	TEXT("랩 출력 언어: ko 또는 ja. 명령줄 -BugHuntLang= 이 이 값을 넣는다. 비우면 에디터/OS 언어. / ラボ出力の言語: ko または ja。コマンドライン -BugHuntLang= がこの値を入れる。空ならエディター／OS の言語。"));
 
 bool GReadCommandLine = false;
 
