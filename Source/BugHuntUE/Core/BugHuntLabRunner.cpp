@@ -28,6 +28,9 @@
 #include "Labs/Lab10_Balance.h"
 #include "Labs/Lab11_RepNotify.h"
 #include "Labs/Lab12_Chest.h"
+#include "Labs/Lab13_FireSound.h"
+#include "Labs/Lab14_Explosion.h"
+#include "Labs/Lab15_AlarmBell.h"
 
 namespace
 {
@@ -54,6 +57,10 @@ const FLabEntry GLabs[] = {
 	// 3부: 멀티플레이
 	{ TEXT("호스트 HP 바"),  TEXT("리슨 서버 호스트 화면만 HP 바가 안 바뀐다"),  [] { return ABH_Lab11::StaticClass(); } },
 	{ TEXT("보물 상자"),     TEXT("클라이언트가 연 상자의 골드가 서버에 없다"),  [] { return ABH_Lab12::StaticClass(); } },
+	// 4부: 사운드
+	{ TEXT("블래스터 발사음"), TEXT("발사음이 섬광보다 늦게 난다 (첫 발, 그리고 가끔)"), [] { return ABH_Lab13::StaticClass(); } },
+	{ TEXT("폭발 통"),       TEXT("폭발음이 터지자마자 끊긴다"),                 [] { return ABH_Lab14::StaticClass(); } },
+	{ TEXT("경보 종"),       TEXT("호스트만 종소리를 듣는다"),                   [] { return ABH_Lab15::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 

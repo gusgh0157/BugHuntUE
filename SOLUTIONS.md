@@ -264,3 +264,86 @@ void ABH_PlayerController::Server_OpenChest_Implementation(ABH_Chest* Chest)
 ```
 (`HasAuthority()` 분기 없이 항상 `Server_OpenChest`를 불러도 된다. 서버에서 부르면 바로 실행된다.)
 **교훈:** "상태를 바꾸는 코드는 서버에서만"이 원칙이다. 상태를 바꾸는 함수에 `check(HasAuthority())`나 `if (!HasAuthority()) return;`을 두면 이런 버그가 바로 드러난다. Server RPC는 그 클라이언트가 **소유한 액터**(PlayerController, 조종하는 Pawn, PlayerState)에서만 서버에 도착한다. 상자 액터에 Server RPC를 만들면 클라이언트가 소유하지 않아서 조용히 버려진다(Output Log에 경고). UFUNCTION 추가는 Live Coding으로 안 되므로 에디터를 닫고 빌드한다.
+
+---
+
+# 4부: 사운드
+
+## Lab 13 — 소프트 레퍼런스를 쏠 때 처음 불러옴
+```
+틀린 결과:     1번째 발사 3프레임(약 13ms) 늦음, 2번째 0, 3번째(GC 뒤) 다시 2프레임 늦음
+멈춘 위치:     Fire 중단점 → FireSound.Get() == nullptr → RequestAsyncLoad 경로. 콜백은 몇 프레임 뒤 비동기 로딩 틱에서 불림
+              로그의 "(발사음 메모리에 없음)" / obj list class=SoundWave 로 GC 전후 비교
+처음 어긋난 곳: 1번째 Fire: 소리가 메모리에 없어서 그 자리에서 비동기 로드를 시작
+진짜 원인:     ① 꼭 즉시 울려야 하는 소리를 "쏠 때" 불러왔다. 비동기 로드는 빨라도 다음 프레임 이후에 끝난다.
+              ② 불러온 뒤에도 하드 레퍼런스가 없어서(소프트 포인터와 버려진 핸들뿐) GC가 다시 내렸다 → GC 뒤 첫 발이 또 늦다.
+```
+**수정:**
+```cpp
+// Lab13_FireSound.h
+protected:
+    virtual void BeginPlay() override;
+
+    UPROPERTY()
+    TObjectPtr<USoundBase> LoadedFireSound;     // 붙잡아 두는 하드 레퍼런스
+
+// Lab13_FireSound.cpp
+void ABH_Blaster::BeginPlay()
+{
+    Super::BeginPlay();
+    LoadedFireSound = FireSound.LoadSynchronous();   // 무기를 들 때(로딩 화면, 장착 시점) 미리
+}
+
+void ABH_Blaster::Fire()
+{
+    if (LoadedFireSound)
+    {
+        PlayFireSound(LoadedFireSound, GFrameCounter, FPlatformTime::Seconds());
+        return;
+    }
+    ... (기존 코드는 예비 경로로 남겨도 된다)
+}
+```
+게임 중 멈춤(히치)까지 피하려면 `LoadSynchronous` 대신 장착 시점에 `RequestAsyncLoad`로 미리 불러 두고 반환된 `TSharedPtr<FStreamableHandle>`을 멤버로 보관한다. 아예 무기의 `UPROPERTY` 하드 레퍼런스로 바꾸면 무기와 함께 로드된다.
+**교훈:** "첫 번째만 늦다"는 지연 로드를 1순위로 의심한다. 소프트 레퍼런스는 **로드 시점과 수명을 내가 책임진다**는 뜻이다. 쏠 때 동기 로드하면 늦지는 않지만 그 프레임이 멈추고(히치), 비동기 로드하면 멈추지 않지만 늦는다. 정답은 "쓰기 전에 미리, 그리고 붙잡아 두기". 실제 프로젝트에서는 Unreal Insights의 Asset Loading 트랙으로 "발사 순간에 로드가 있었나"를 확인한다.
+
+## Lab 14 — 액터에 붙인 소리가 액터와 함께 사라짐
+```
+틀린 결과:     0.1초 뒤 폭발음 재생 중 아님 (폭발음 길이 0.28초)
+멈춘 위치:     Explode 의 Destroy() 줄 → 조사식 Audio->GetOwner() == BH_ExplosiveBarrel_0 (로그의 경로도 ...BH_ExplosiveBarrel_0.AudioComponent_0)
+진짜 원인:     SpawnSoundAttached 는 붙일 컴포넌트의 액터 안에 오디오 컴포넌트를 만든다. 바로 Destroy() 하면 그 컴포넌트도 파괴되고 소리가 멈춘다.
+```
+**수정:**
+```cpp
+UAudioComponent* Audio = UGameplayStatics::SpawnSoundAtLocation(GetWorld(), ExplosionSound, GetActorLocation());
+Destroy();
+```
+⚠️ 첫 인자에 `this`를 넘기면 **여전히 잘린다.** UE 5.8의 `SpawnSoundAtLocation`은 WorldContextObject의 액터를 컴포넌트의 주인(Outer)으로 삼기 때문이다(로그 경로가 `...BH_ExplosiveBarrel_0.AudioComponent_0`). `GetWorld()`를 넘기면 주인이 `WorldSettings`가 되어(`...WorldSettings_1.AudioComponent_0`) 통이 사라져도 끝까지 재생된다. 실제로 이 실수로 한 번 더 FAIL을 보고 찾은 함정이다.
+(따라 움직여야 하는 소리라면: 액터를 바로 지우지 말고 숨기고 충돌을 끈 뒤 `SetLifeSpan(소리 길이)`.)
+**교훈:** 컴포넌트의 수명은 액터의 수명이다. "사라지면서 내는 소리·이펙트"는 액터에 붙이지 않는다. 같은 원리로 `SpawnEmitterAttached`/`SpawnSystemAttached`한 파티클도 잘린다. 참고: 엔진은 1초 이하의 짧은 소리를 들을 수 없는 위치에서 재생하면 컴포넌트를 아예 만들지 않는다(`au.SoundDistanceOptimizationLength`). 이 랩은 결과가 카메라 위치에 따라 흔들리지 않게 그 최적화를 끄고 검사한다.
+
+## Lab 15 — 서버에서만 재생한 소리
+```
+틀린 결과:     [리슨 서버] 3번 PASS, [클라이언트] 0번 FAIL
+멈춘 위치:     PlayRingSound 중단점 → 항상 GetNetMode() == NM_ListenServer. 클라이언트에선 한 번도 안 멈춤
+진짜 원인:     PlaySoundAtLocation 은 부른 머신의 스피커에서만 울린다. 소리(와 파티클 등 연출)는 복제되지 않는다.
+```
+**수정:**
+```cpp
+// Lab15_AlarmBell.h
+UFUNCTION(NetMulticast, Unreliable)
+void Multicast_PlayRing();
+
+// Lab15_AlarmBell.cpp
+void ABH_AlarmBell::Ring()
+{
+    check(HasAuthority());
+    Multicast_PlayRing();           // 서버 자신 + 모든 클라이언트에서 실행
+}
+
+void ABH_AlarmBell::Multicast_PlayRing_Implementation()
+{
+    PlayRingSound();
+}
+```
+**교훈:** 랩 11과 같은 뿌리다. 상태(HP)는 복제 변수로, **일회성 연출**(소리, 이펙트)은 NetMulticast로 보낸다. 연출은 하나쯤 빠져도 게임이 망가지지 않으니 보통 `Unreliable`. 서버가 데디케이티드면 서버의 `PlaySound`는 아무도 듣지 못한다. 반대로 "늦게 접속한 사람도 들어야 하는" 지속음(경보가 계속 울리는 중)이라면 Multicast가 아니라 복제 변수(`bAlarmActive` + RepNotify)로 상태를 보내야 한다.
