@@ -31,6 +31,9 @@
 #include "Labs/Lab13_FireSound.h"
 #include "Labs/Lab14_Explosion.h"
 #include "Labs/Lab15_AlarmBell.h"
+#include "Labs/Lab16_Highlight.h"
+#include "Labs/Lab17_ItemIcons.h"
+#include "Labs/Lab18_TeamColor.h"
 
 namespace
 {
@@ -61,6 +64,10 @@ const FLabEntry GLabs[] = {
 	{ TEXT("블래스터 발사음"), TEXT("발사음이 섬광보다 늦게 난다 (첫 발, 그리고 가끔)"), [] { return ABH_Lab13::StaticClass(); } },
 	{ TEXT("폭발 통"),       TEXT("폭발음이 터지자마자 끊긴다"),                 [] { return ABH_Lab14::StaticClass(); } },
 	{ TEXT("경보 종"),       TEXT("호스트만 종소리를 듣는다"),                   [] { return ABH_Lab15::StaticClass(); } },
+	// 5부: 이미지 / 렌더링
+	{ TEXT("상자 강조"),     TEXT("마우스를 올려도 상자가 빨개지지 않는다"),     [] { return ABH_Lab16::StaticClass(); } },
+	{ TEXT("인벤토리 아이콘"), TEXT("스크롤하면 엉뚱한 아이템 아이콘이 뜬다"),   [] { return ABH_Lab17::StaticClass(); } },
+	{ TEXT("팀 색"),         TEXT("팀 색이 기획서보다 밝고 물 빠져 보인다"),     [] { return ABH_Lab18::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 

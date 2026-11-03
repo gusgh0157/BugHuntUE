@@ -10,7 +10,10 @@ public class BugHuntUE : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"NetCore"
+			"NetCore",
+			"UMG",
+			"Slate",
+			"SlateCore"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {

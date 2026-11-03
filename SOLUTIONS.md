@@ -347,3 +347,66 @@ void ABH_AlarmBell::Multicast_PlayRing_Implementation()
 }
 ```
 **교훈:** 랩 11과 같은 뿌리다. 상태(HP)는 복제 변수로, **일회성 연출**(소리, 이펙트)은 NetMulticast로 보낸다. 연출은 하나쯤 빠져도 게임이 망가지지 않으니 보통 `Unreliable`. 서버가 데디케이티드면 서버의 `PlaySound`는 아무도 듣지 못한다. 반대로 "늦게 접속한 사람도 들어야 하는" 지속음(경보가 계속 울리는 중)이라면 Multicast가 아니라 복제 변수(`bAlarmActive` + RepNotify)로 상태를 보내야 한다.
+
+# 5부: 이미지 / 렌더링
+
+## Lab 16 — 만든 MID를 메시에 끼우지 않음
+```
+틀린 결과:     왼쪽 상자 (0.90, 0.90, 0.90) FAIL, 머티리얼 이름이 MID_... 가 아니라 BasicShapeMaterial
+멈춘 위치:     SetHighlighted 의 SetVectorParameterValue 줄 → 조사식 MID 와 Mesh->GetMaterial(0) 의 주소가 다름
+진짜 원인:     UMaterialInstanceDynamic::Create 는 새 인스턴스를 만들기만 한다. 메시는 계속 공유 머티리얼을 쓰므로, 아무도 안 쓰는 MID의 색만 바뀐다.
+```
+**수정:**
+```cpp
+void ABH_Crate::SetHighlighted(bool bOn)
+{
+    UMaterialInstanceDynamic* MID = Mesh->CreateDynamicMaterialInstance(0);   // 만들고, 끼우고, 이미 MID면 재사용
+    MID->SetVectorParameterValue(ColorParam, bOn ? FLinearColor::Red : FLinearColor::White);
+}
+```
+`Create`를 쓰고 싶다면 `Mesh->SetMaterial(0, MID)`를 덧붙이면 된다. 다만 그러면 부를 때마다 새 MID가 생기므로 처음 한 번만 만들어 멤버에 들고 있어야 한다.
+**교훈:** "값은 바꿨는데 화면이 그대로"라면 **바꾼 객체와 그리는 객체가 같은가**부터 본다. 그렇다고 공유 머티리얼 에셋을 직접 고치면 같은 머티리얼을 쓰는 상자가 전부 바뀐다(오른쪽 상자 검사가 그걸 잡는다). 상자마다 다른 색 = 상자마다 MID.
+
+## Lab 17 — 늦게 도착한 비동기 로드 콜백이 재사용된 칸을 덮어씀
+```
+틀린 결과:     칸 이름 '회복 물약' PASS, 아이콘 AICON-Red FAIL
+기록표:        프레임 0 칸 ← 루비 반지 (아이콘 없음 → 비동기 요청)
+               프레임 1 칸 ← 회복 물약 (아이콘 있음 → 바로 넣음)
+               프레임 2 루비 반지 아이콘 로드 완료 → 칸에 넣음   ← 범인
+멈춘 위치:     람다 안 SetBrushFromTexture 중단점 → Item.Name '루비 반지', this->ShownName '회복 물약'
+진짜 원인:     콜백은 "요청할 때의 아이템"을 기억한 채, 칸이 이미 다른 아이템으로 바뀐 뒤에 실행된다.
+```
+**수정 (둘 중 하나):**
+```cpp
+// 1) 콜백에서 아직 같은 아이템인지 확인
+[this, Item]
+{
+    if (ShownName != Item.Name)
+    {
+        return;     // 이미 다른 아이템을 보여 주는 칸
+    }
+    IconImage->SetBrushFromTexture(Item.Icon.Get());
+}
+
+// 2) 새 아이템을 넣을 때 이전 요청을 취소 (헤더에 TSharedPtr<FStreamableHandle> PendingLoad;)
+if (PendingLoad.IsValid()) { PendingLoad->CancelHandle(); PendingLoad.Reset(); }
+...
+PendingLoad = UAssetManager::GetStreamableManager().RequestAsyncLoad(...);
+```
+(2)를 쓸 때도 **바로 넣는 경로(이미 로드된 아이콘)에서 이전 요청을 취소**해야 한다. 이 랩에서 덮어쓰는 쪽이 바로 그 경로 다음에 도착한다. 실제 프로젝트에서는 이름보다 아이템 ID나 요청 번호로 비교한다.
+**교훈:** 비동기 콜백은 "요청한 때의 세상"을 기억하고 "완료된 때의 세상"에서 실행된다. 리스트뷰·타일뷰처럼 **위젯을 재사용**하는 UI에서 가장 흔하다. 이런 버그는 순서가 핵심이므로 로그에 프레임 번호를 찍어 기록표로 만든다.
+
+## Lab 18 — sRGB 색을 Linear 변환 없이 /255
+```
+틀린 결과:     #FF8000 → 화면 #FFBC00 (G 128 → 188 FAIL), #008080 → #00BCBC (G·B FAIL). 0x00과 0xFF는 PASS
+멈춘 위치:     ToMaterialColor 중단점 → 조사식 Color.G / 255.f = 0.502, FLinearColor(Color).G = 0.216
+진짜 원인:     FColor(디자인 툴 값)는 sRGB, 머티리얼 파라미터는 Linear다. /255 는 변환이 아니라 재해석이라, 화면에 나갈 때 sRGB로 한 번 더 밝아진다.
+```
+**수정:**
+```cpp
+FLinearColor ToMaterialColor(const FColor& Color)
+{
+    return FLinearColor(Color);     // sRGB → Linear 감마 변환 (= FLinearColor::FromSRGBColor)
+}
+```
+**교훈:** 0과 1(0x00, 0xFF)은 감마 변환해도 그대로라서 순수한 빨강·검정으로만 테스트하면 이 버그를 못 잡는다. 중간값(0x80)을 꼭 넣는다. "물 빠지고 밝다" = Linear 자리에 sRGB 값, "너무 어둡고 진하다" = 그 반대. 텍스처라면 같은 문제가 sRGB 체크박스로 나타난다(색 텍스처 켬, 노멀·마스크·러프니스 끔). 엔진 함수 이름: `FLinearColor(FColor)`/`FromSRGBColor`는 변환, `FColor::ReinterpretAsLinear`는 변환 없음, `ToFColor(true)`/`ToFColorSRGB`는 Linear → sRGB.

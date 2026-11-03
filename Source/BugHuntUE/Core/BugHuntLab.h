@@ -23,7 +23,7 @@ protected:
 	// 결과 요약을 찍는다. 랩이 만든 액터는 다음 랩을 실행할 때 정리된다 (그 전까지 World Outliner에서 볼 수 있다).
 	void FinishLab();
 
-	// Seconds초 뒤에 Func를 실행한다 (게임 시간 기준).
+	// Seconds초 뒤에 Func를 실행한다 (게임 시간 기준). 0이면 다음 프레임.
 	void After(float Seconds, TFunction<void()> Func);
 
 	// 멀티플레이 랩용. 명령줄에 -BugHuntWaitForClient 가 있으면 원격 플레이어가 접속할 때까지(최대 2분)

@@ -38,6 +38,12 @@ void ABugHuntLab::FinishLab()
 
 void ABugHuntLab::After(float Seconds, TFunction<void()> Func)
 {
+	// SetTimer 는 Rate <= 0 이면 타이머를 지우기만 하므로, 0초는 "다음 프레임"으로 처리한다.
+	if (Seconds <= 0.f)
+	{
+		GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, MoveTemp(Func)));
+		return;
+	}
 	FTimerHandle Unused;
 	GetWorldTimerManager().SetTimer(Unused, FTimerDelegate::CreateWeakLambda(this, MoveTemp(Func)), Seconds, false);
 }
