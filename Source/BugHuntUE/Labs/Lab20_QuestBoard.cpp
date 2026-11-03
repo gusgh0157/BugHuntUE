@@ -77,6 +77,7 @@ void ABH_Lab20::StartLab()
 		BugHunt::Note(TEXT("스탠드얼론으로 실행 중. 리슨 서버 + 클라이언트로 실행해야 버그가 보입니다 (README 참고)."));
 	}
 
+// [JA] 以下はサーバーで動くシナリオです。
 	const TArray<FName> Names = { TEXT("늑대사냥"), TEXT("약초채집"), TEXT("편지배달") };
 	const int32 Wolves = BugHunt::CaseInt(3, 1, 9);
 	const int32 Herbs = BugHunt::CaseInt(5, 1, 9);
@@ -104,27 +105,44 @@ void ABH_Lab20::StartLab()
 		After(3.5f, [this] { FinishLab(); });
 	});
 }
+		// [JA] 掲示板がクライアントに届いた後で進行度を上げる。
 
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 랩 38 처럼 리슨 서버 + 클라이언트로 실행하세요 (PIE Number of Players 2, Play As Listen Server).
 // [리슨 서버] 줄은 통과하고 [클라이언트] 줄만 0 으로 실패합니다. 퀘스트 이름은 클라이언트에 도착했는데 진행도는 왜 안 왔을까요?
 // 클라이언트 프로세스에서 ABH_QuestBoard::GetProgress 에 중단점을 걸고 조사식에 Quests.Items 를 펼쳐 보세요.
 #pragma endregion
+		// [JA] レプリケーションされる時間を十分に与えた後、すべてのマシンでそれぞれ検査する。
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // 일반 UPROPERTY(Replicated) TArray 는 엔진이 매번 이전 값과 비교해서 바뀐 걸 찾아냅니다.
 // FFastArraySerializer 는 비교하지 않습니다. "이 원소가 바뀌었다" 는 표시(ReplicationKey)를 보고 그 원소만 보냅니다.
 // AddQuest 와 AddProgress 를 나란히 놓고 보세요. 하나에만 있는 줄이 있습니다.
 #pragma endregion
 
-#pragma region 힌트 3
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
+#pragma region 힌트 3 / ヒント 3
 // 원소를 바꾼 뒤에는 그 원소를 표시해야 합니다:
 //     Entry.Progress += Amount;
 //     Quests.MarkItemDirty(Entry);
 // 원소를 지웠다면 Quests.MarkArrayDirty(). 클라이언트에서 원소별로 반응하려면 FBH_QuestEntry 에
 // PostReplicatedChange(const FBH_QuestList&) 같은 콜백을 만들면 됩니다 (RepNotify 의 원소 버전).
+
+// [JA] ラボ 38 のようにリッスンサーバー + クライアントで実行してください（PIE Number of Players 2、Play As Listen Server）。
+// [JA] [リッスンサーバー] の行は通り、[クライアント] の行だけが 0 で失敗します。クエスト名はクライアントに届いたのに、進行度はなぜ届かなかったのでしょう？
+// [JA] クライアントのプロセスで ABH_QuestBoard::GetProgress にブレークポイントを置き、ウォッチで Quests.Items を展開してみてください。
 #pragma endregion
+
+// [JA] 通常の UPROPERTY(Replicated) TArray は、エンジンが毎回前の値と比べて変わったものを見つけ出します。
+// [JA] FFastArraySerializer は比べません。「この要素が変わった」という印（ReplicationKey）を見て、その要素だけを送ります。
+// [JA] AddQuest と AddProgress を並べて見てください。片方にしかない行があります。
+
+// [JA] 要素を変えた後は、その要素に印を付けなければなりません:
+// [JA]     Entry.Progress += Amount;
+// [JA]     Quests.MarkItemDirty(Entry);
+// [JA] 要素を削除したなら Quests.MarkArrayDirty()。クライアントで要素ごとに反応するには、FBH_QuestEntry に
+// [JA] PostReplicatedChange(const FBH_QuestList&) のようなコールバックを作れば済みます（RepNotify の要素版）。

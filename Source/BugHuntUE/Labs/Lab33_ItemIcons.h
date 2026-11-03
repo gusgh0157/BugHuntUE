@@ -16,11 +16,13 @@ struct FBH_ItemData
 	FString Name;
 
 	// 아이콘은 인벤토리를 열 때만 필요하므로 소프트 레퍼런스로 둔다.
+	// [JA] アイコンはインベントリを開くときだけ必要なので、ソフト参照にしておく。
 	UPROPERTY()
 	TSoftObjectPtr<UTexture2D> Icon;
 };
 
 // 인벤토리 한 칸. 스크롤할 때 칸 위젯을 새로 만들지 않고 재사용한다 (리스트 뷰 방식).
+// [JA] インベントリの 1 マス。スクロールするときにマスのウィジェットを新しく作らず再利用する（リストビュー方式）。
 UCLASS()
 class UBH_ItemSlot : public UObject
 {

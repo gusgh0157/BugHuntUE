@@ -56,7 +56,9 @@ void ABH_Passenger::Board(ABH_Elevator* Elevator)
 
 void ABH_Lab40::StartLab()
 {
+		// [JA] 実習用の安全装置（Core/BugHuntHang.h）。バグはこの行ではない。
 	const float TargetHeight = BugHunt::CaseFloat(300.f, 200.f, 600.f);
+		// [JA] CPU を使いすぎないように少し休む
 	const float Speed = BugHunt::CaseFloat(600.f, 400.f, 1000.f);
 
 	ABH_Elevator* Elevator = SpawnLabActor<ABH_Elevator>();
@@ -83,7 +85,7 @@ void ABH_Lab40::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 진짜 게임이라면 여기서 에디터가 굳습니다. 그 상황을 직접 겪어 보세요:
 //   1) 콘솔에 BugHunt.HangBudgetSeconds 30 을 넣고 BugHunt.Lab 40 → 게임 화면이 30초 동안 굳습니다.
 //   2) 굳어 있는 동안 VS 에서 디버그 → 모두 중단 (Ctrl+Alt+Break).
@@ -91,18 +93,37 @@ void ABH_Lab40::StartLab()
 //   4) 조사식에 Elevator->Height, Elevator->TicksWhileMoving 을 넣고 F5 → 다시 모두 중단. 값이 변하나요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // 엘리베이터를 움직이는 것은 Tick 입니다. Tick 은 누가, 어느 스레드에서 부르나요?
 // 게임 스레드 하나가 "Tick 돌리기 → 그리기 → 다음 프레임"을 차례로 합니다. 그 게임 스레드가 while 안에서 기다리면
 // 다음 프레임이 오지 않고, Tick 도 오지 않고, bArrived 는 영원히 false 입니다. Sleep 을 넣어도 마찬가지입니다.
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 게임 코드에서 "다른 객체가 바꿔 줄 값을 while 로 기다리기"는 거의 항상 이 버그입니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 기다리지 말고 "도착하면 불러 달라"고 등록하세요. 엘리베이터에는 이미 OnArrived 델리게이트가 있습니다.
 //     Elevator->Call(TargetHeight, Speed);
 //     Elevator->OnArrived.AddUObject(this, &ABH_Passenger::Board, Elevator);
 // (Board 에 인자를 더 넘길 수 있습니다: AddUObject 의 뒤쪽 인자는 페이로드.)
+
+// [JA] 本物のゲームなら、ここでエディターが固まります。その状況を実際に体験してみてください:
+// [JA]   1) コンソールに BugHunt.HangBudgetSeconds 30 を入れて BugHunt.Lab 40 → ゲーム画面が 30 秒間固まります。
+// [JA]   2) 固まっている間に VS で デバッグ → すべて中断（Ctrl+Alt+Break）。
+// [JA]   3) デバッグ → ウィンドウ → スレッド（Ctrl+Alt+H）。"GameThread" をダブルクリックして呼び出し履歴を見てください。どこで回っていますか？
+// [JA]   4) ウォッチに Elevator->Height, Elevator->TicksWhileMoving を入れて F5 → もう一度すべて中断。値は変わりますか？
 // 매 프레임 확인하는 방법도 됩니다: 타이머(SetTimer 0.05초 반복)나 이 액터의 Tick 에서 bArrived 를 보고 탑승.
 // 핵심은 게임 스레드를 돌려주는 것입니다.
 #pragma endregion
+
+// [JA] エレベーターを動かしているのは Tick です。Tick は誰が、どのスレッドで呼ぶのでしょう？
+// [JA] 1 つのゲームスレッドが「Tick を回す → 描画 → 次のフレーム」を順番に行います。そのゲームスレッドが while の中で待つと、
+// [JA] 次のフレームが来ず、Tick も来ず、bArrived は永遠に false です。Sleep を入れても同じです。
+// [JA] ゲームコードで「別のオブジェクトが変えてくれる値を while で待つ」のは、ほぼ必ずこのバグです。
+
+// [JA] 待つのではなく、「到着したら呼んでほしい」と登録してください。エレベーターにはすでに OnArrived デリゲートがあります。
+// [JA]     Elevator->Call(TargetHeight, Speed);
+// [JA]     Elevator->OnArrived.AddUObject(this, &ABH_Passenger::Board, Elevator);
+// [JA] （Board に引数を追加で渡せます: AddUObject の後ろの引数はペイロード。）
+// [JA] 毎フレーム確認する方法でもかまいません: タイマー（SetTimer 0.05 秒の繰り返し）や、このアクターの Tick で bArrived を見て搭乗。
+// [JA] 肝心なのは、ゲームスレッドを返してあげることです。

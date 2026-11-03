@@ -60,6 +60,7 @@ void ABH_Lab38::StartLab()
 	const int32 Damage = BugHunt::CaseInt(15, 5, 30);
 	WaitForClientThen([this, Damage]
 	{
+// [JA] 以下はサーバーで動くシナリオです。
 		ABH_NetHero* Hero = SpawnLabActor<ABH_NetHero>(FVector(0.f, 0.f, 100.f));
 		BugHunt::Note(FString::Printf(TEXT("영웅 HP 100. 0.5초 간격으로 %d씩 세 번 맞는다."), Damage));
 
@@ -77,22 +78,38 @@ void ABH_Lab38::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 이 랩은 PIE 설정을 바꿔서 두 번 실행해 보세요.
+		// [JA] レプリケーションされる時間を十分に与えてから、すべてのマシンでそれぞれ検査する。
 //   ① 플레이 버튼 옆 ⋮ → Number of Players 2, Net Mode "Play As Listen Server"
 //   ② 서버 창(제목에 Server)에서 콘솔을 열고 BugHunt.Lab 38
 // Output Log에서 [리슨 서버] 줄과 [클라이언트] 줄을 비교하세요. 어느 쪽만 [FAIL] 인가요?
 // "HP 바 갱신" 로그는 어느 머신에서 찍히나요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // OnRep_Health 와 ApplyDamage 에 중단점을 거세요. PIE의 서버와 클라이언트는 같은 프로세스라
 // 한 디버거에서 둘 다 멈춥니다. 멈출 때마다 조사식에 GetNetMode() 를 넣어 누구인지 보세요
 // (NM_ListenServer / NM_Client). 서버에서 OnRep_Health 가 한 번이라도 불리나요?
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // C++ 의 RepNotify(ReplicatedUsing)는 "복제로 값을 받은 쪽"에서만 불립니다. 값을 직접 바꾼 서버에서는 안 불립니다.
 // (블루프린트의 RepNotify 는 서버에서도 불려서 더 헷갈립니다.)
+
+// [JA] このラボは PIE の設定を変えて 2 回実行してみてください。
+// [JA]   ① プレイボタンの横の ⋮ → Number of Players 2、Net Mode "Play As Listen Server"
+// [JA]   ② サーバーのウィンドウ（タイトルに Server）でコンソールを開いて BugHunt.Lab 38
+// [JA] アウトプットログで [リッスンサーバー] の行と [クライアント] の行を比べてください。どちらだけが [FAIL] ですか？
+// [JA] 「HP バー更新」のログはどのマシンで記録されますか？
 // 리슨 서버 호스트도 화면이 있는 플레이어입니다. 서버에서 값을 바꾼 곳에서 무엇을 해 줘야 할까요?
 #pragma endregion
+
+// [JA] OnRep_Health と ApplyDamage にブレークポイントを置いてください。PIE のサーバーとクライアントは同じプロセスなので、
+// [JA] 1 つのデバッガーで両方とも止まります。止まるたびにウォッチに GetNetMode() を入れて、どちらなのか見てください
+// [JA] （NM_ListenServer / NM_Client）。サーバーで OnRep_Health が一度でも呼ばれますか？
+
+// [JA] C++ の RepNotify（ReplicatedUsing）は「レプリケーションで値を受け取った側」でだけ呼ばれます。値を直接変えたサーバーでは呼ばれません。
+// [JA] （ブループリントの RepNotify はサーバーでも呼ばれるので、さらに紛らわしいです。）
+// [JA] リッスンサーバーのホストも画面を持つプレイヤーです。サーバーで値を変えた箇所で、何をしてあげるべきでしょう？

@@ -26,6 +26,7 @@ void ABH_Lab17::StartLab()
 	{
 		const TCHAR* Pool[] = { TEXT("도적"), TEXT("궁수"), TEXT("기사"), TEXT("마법사"), TEXT("사제"), TEXT("창병"), TEXT("검사"), TEXT("드루이드") };
 		Units.Reset();
+		// [JA] 途中を抜いても後ろを詰めないので速い
 		const int32 Count = BugHunt::CaseInt(0, 5, UE_ARRAY_COUNT(Pool));
 		for (int32 i = 0; i < Count; ++i)
 		{
@@ -49,6 +50,7 @@ void ABH_Lab17::StartLab()
 		Expected.Remove(Unit);
 	}
 	const FString ExpectedText = FString::Join(Expected, TEXT(" → "));
+		// [JA] 最後尾ではないユニット 2 人が倒れる
 	BugHunt::Expect(TEXT("남은 유닛 수"), Expected.Num(), Turns->Order.Num());
 	BugHunt::ExpectTrue(FString::Printf(TEXT("행동 순서 == %s (실제: %s)"), *ExpectedText, *Turns->Describe()), Turns->Order == Expected);
 	FinishLab();
@@ -58,17 +60,27 @@ void ABH_Lab17::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 쓰러진 유닛은 잘 빠졌는데(개수 PASS) 순서가 틀립니다. 민첩이 가장 낮은 유닛이 어디로 갔나요?
 // RemoveUnit 에 중단점을 걸고 RemoveAtSwap 줄 앞뒤로 Order 를 펼쳐 비교하세요.
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // RemoveAtSwap 은 지울 칸에 "맨 끝 원소"를 옮겨 넣고 배열을 하나 줄입니다. 뒤쪽을 한 칸씩 당기지 않으니 O(1) 이지만,
 // 순서가 바뀝니다. 순서가 의미 없는 목록(보이는 적 목록 등)에서만 씁니다. RemoveSwap, RemoveAllSwap 도 같습니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 순서를 지켜야 하면 RemoveAt(Index) (뒤를 당김) 또는 Order.Remove(Unit).
 // 인덱스로 "다음 차례"를 기억하는 코드가 있다면, 지운 칸이 그 인덱스 앞이었는지도 같이 고쳐야 합니다.
 #pragma endregion
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
+
+// [JA] 倒れたユニットはちゃんと抜けた（数は PASS）のに、順番が間違っています。素早さが一番低いユニットはどこへ行きましたか？
+// [JA] RemoveUnit にブレークポイントを設定し、RemoveAtSwap の行の前後で Order を展開して比べてください。
+
+// [JA] RemoveAtSwap は消す場所に「最後の要素」を移して、配列を 1 つ縮めます。後ろを 1 つずつ詰めないので O(1) ですが、
+// [JA] 順番が変わります。順番に意味のないリスト（見えている敵のリストなど）でだけ使います。RemoveSwap、RemoveAllSwap も同じです。
+
+// [JA] 順番を守る必要があるなら RemoveAt(Index)（後ろを詰める）または Order.Remove(Unit)。
+// [JA] インデックスで「次の番」を覚えているコードがあるなら、消した場所がそのインデックスより前だったかどうかも合わせて直さなければなりません。

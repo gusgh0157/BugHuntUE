@@ -5,6 +5,7 @@
 #include "Lab45_Minimap.generated.h"
 
 // 플레이어. 맵에 하나뿐이다.
+// [JA] プレイヤー。マップに 1 人だけ。
 UCLASS(NotPlaceable)
 class ABH_MapHero : public AActor
 {
@@ -15,6 +16,7 @@ public:
 };
 
 // 미니맵 아이콘. 매 프레임 플레이어와의 거리에 따라 아이콘을 흐리게 한다.
+// [JA] ミニマップのアイコン。毎フレーム、プレイヤーとの距離に応じてアイコンを薄くする。
 UCLASS(NotPlaceable)
 class ABH_MapMarker : public AActor
 {
@@ -26,6 +28,8 @@ public:
 
 	// 엔진의 UGameplayStatics::GetAllActorsOfClass 와 같은 일을 하는 함수 (월드의 모든 액터를 훑는다). 버그 없음.
 	// 몇 번 불렸는지 세려고 감쌌다.
+	// [JA] エンジンの UGameplayStatics::GetAllActorsOfClass と同じことをする関数（ワールドのすべてのアクターを走査する）。バグなし。
+	// [JA] 何回呼ばれたか数えるためにラップした。
 	static ABH_MapHero* FindHero(const UWorld* World);
 	static int32 SearchCount;
 

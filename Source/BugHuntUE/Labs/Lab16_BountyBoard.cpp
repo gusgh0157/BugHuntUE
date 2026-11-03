@@ -15,6 +15,7 @@ void ABH_BountyBoard::RecordHunt(FName Target, const TArray<FName>& Killed)
 			++(*TargetKills);
 		}
 		else
+	// [JA] 依頼対象はほぼ毎回倒すので、要素をあらかじめ探しておく。
 		{
 			++Kills.FindOrAdd(Monster);
 		}
@@ -45,6 +46,7 @@ void ABH_Lab16::StartLab()
 		{
 			for (int32 i = 0; i < Wolves; ++i)
 			{
+	// [JA] 公開入力: オオカミ、スライム（新しい種類）、オオカミ、ゴブリン（新しい種類 → 5 種類）、オオカミ
 				Killed.Add(Wolf);
 				if (BugHunt::CaseInt(0, 0, 1) == 1)
 				{
@@ -76,19 +78,31 @@ void ABH_Lab16::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 로그의 "의뢰 대상 N마리" 는 맞게 올라가는데 게시판 값은 다릅니다. 둘은 같은 칸이어야 합니다.
 // RecordHunt 에 중단점을 걸고 조사식에 TargetKills 와 Kills.Find(Target) 를 넣어 비교하세요. 언제부터 달라지나요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // TMap 은 내부적으로 원소를 배열(TSparseArray)에 담습니다. 새 키를 넣다가 칸이 모자라면 원소를 새 메모리로 옮깁니다.
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // Find 가 돌려준 포인터는 "다음 Add/FindOrAdd/Emplace/Remove 전까지만" 유효합니다. 랩 23 의 TArray 와 같은 이야기입니다.
 // 이 게시판은 인라인 버퍼라 옛 칸에 써도 죽지 않고 값만 사라집니다. 기본 할당자였다면 해제된 힙에 썼을 것입니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
+
+// [JA] ログの「依頼対象 N 匹」は正しく増えていくのに、掲示板の値は違います。2 つは同じ要素のはずです。
+// [JA] RecordHunt にブレークポイントを設定し、ウォッチに TargetKills と Kills.Find(Target) を入れて比べてください。いつから違ってきますか？
 // 맵을 바꿀 수 있는 호출 뒤에는 다시 찾으세요. 가장 간단한 방법:
 //     ++Kills.FindOrAdd(Monster);   // 대상이든 아니든 같은 방식으로
 // 의뢰 대상만 따로 세고 싶다면 포인터 대신 지역 int32 에 세었다가 끝에 Kills[Target] += Count.
 #pragma endregion
+
+// [JA] TMap は内部で要素を配列（TSparseArray）に格納します。新しいキーを入れるときに場所が足りなければ、要素を新しいメモリへ移します。
+// [JA] Find が返したポインタは「次の Add/FindOrAdd/Emplace/Remove の前まで」しか有効ではありません。ラボ 23 の TArray と同じ話です。
+// [JA] この掲示板はインライン バッファなので、古い場所に書き込んでもクラッシュせず、値が消えるだけです。既定のアロケーターだったら解放済みのヒープに書き込んでいたでしょう。
+
+// [JA] マップを変更しうる呼び出しの後では探し直してください。一番簡単な方法:
+// [JA]     ++Kills.FindOrAdd(Monster);   // 対象かどうかに関係なく同じ方法で
+// [JA] 依頼対象だけ別に数えたいなら、ポインタの代わりにローカルの int32 で数えておき、最後に Kills[Target] += Count。

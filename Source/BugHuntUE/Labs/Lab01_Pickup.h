@@ -38,6 +38,7 @@ public:
 	TObjectPtr<USphereComponent> Body;
 
 	// 이 펫의 주인
+	// [JA] このペットの主人
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	TObjectPtr<ABH_Hero> Master;
 };

@@ -5,6 +5,7 @@
 #include "Lab10_Balance.generated.h"
 
 // 슬라임. 기획팀이 ini 로 튜닝할 수 있도록 Config 속성을 쓴다.
+// [JA] スライム。企画チームが ini で調整できるように Config プロパティを使う。
 UCLASS(Config = Game, NotPlaceable)
 class ABH_Slime : public AActor
 {

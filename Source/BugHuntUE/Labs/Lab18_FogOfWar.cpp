@@ -29,6 +29,7 @@ void ABH_Lab18::StartLab()
 	for (int32 j = 0; j < Length; ++j)
 	{
 		Fog->Reveal(Cross, j, TEXT("정찰병"));
+	// [JA] プレイヤーは (0,0)〜(3,0) を、斥候は (2,0)〜(2,3) を歩く。重なるマスは (2,0) の 1 つ。
 		Unique.Add(FIntPoint(Cross, j));
 	}
 	BugHunt::Note(FString::Printf(TEXT("플레이어와 정찰병이 칸 %d개씩 밝혔다. 겹치는 칸 (%d,0)."), Length, Cross));
@@ -46,25 +47,40 @@ void ABH_Lab18::StartLab()
 	FinishLab();
 }
 
+	// [JA] 明らかにしたマスを 1 つずつ問い合わせ直す（1 マスだけだと、運よく同じバケットに入って通ってしまうことがある）。
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 밝힌 칸인데 IsRevealed 가 false 이고, 겹친 칸이 두 번 들어 있습니다.
 // 조사식에 Revealed 를 넣고 펼쳐 겹친 칸 두 개의 X, Y, Source 를 보세요. operator== 로 비교하면 둘은 같은가요?
 // 그런데 왜 TSet 은 둘 다 넣었을까요? TSet 이 원소를 찾을 때 operator== 보다 먼저 보는 것은?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // TSet/TMap 은 GetTypeHash 로 칸(버킷)을 고른 뒤, 그 칸 안에서만 operator== 로 비교합니다.
 // "a == b 이면 GetTypeHash(a) == GetTypeHash(b)" 가 반드시 성립해야 합니다. 여기서는 == 이 보지 않는 Source 가 해시에 섞여서,
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 같은 칸인데 다른 버킷을 찾아갑니다. (운 나쁘게 같은 버킷이면 찾기도 하니 결과가 들쭉날쭉합니다.)
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 해시는 == 에 쓰는 필드만으로 만듭니다.
 //     return HashCombine(GetTypeHash(Key.X), GetTypeHash(Key.Y));
+
+// [JA] 明らかにしたマスなのに IsRevealed が false で、重なったマスが 2 回入っています。
+// [JA] ウォッチに Revealed を入れて展開し、重なった 2 つのマスの X、Y、Source を見てください。operator== で比べると 2 つは同じですか？
+// [JA] では、なぜ TSet は両方とも入れたのでしょう？ TSet が要素を探すとき、operator== より先に見るものは？
 // 같은 함정: 키를 넣은 뒤에 키의 필드를 바꾸면(예: TSet 원소를 const_cast 로 고침) 그 원소는 엉뚱한 버킷에 남습니다.
 // 키는 바꾸지 말고 Remove 한 뒤 새로 Add 하세요.
 #pragma endregion
+
+// [JA] TSet/TMap は GetTypeHash でバケットを選び、そのバケットの中だけで operator== で比べます。
+// [JA] 「a == b なら GetTypeHash(a) == GetTypeHash(b)」が必ず成り立たなければなりません。ここでは == が見ない Source がハッシュに混ざっているため、
+// [JA] 同じマスなのに別のバケットを探しに行きます。（運悪く同じバケットなら見つかることもあるので、結果がばらつきます。）
+
+// [JA] ハッシュは == で使うフィールドだけで作ります。
+// [JA]     return HashCombine(GetTypeHash(Key.X), GetTypeHash(Key.Y));
+// [JA] 同じ落とし穴: キーを入れた後でキーのフィールドを変えると（例: TSet の要素を const_cast で書き換える）、その要素は見当違いのバケットに残ります。
+// [JA] キーは書き換えず、Remove してから新しく Add してください。

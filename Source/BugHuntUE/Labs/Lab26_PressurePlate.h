@@ -8,6 +8,7 @@
 class UBoxComponent;
 
 // 상자를 올려 놓으면 문이 열리는 압력판.
+// [JA] 箱を載せると扉が開く感圧板。
 UCLASS(NotPlaceable)
 class ABH_PressurePlate : public AActor
 {
@@ -28,6 +29,7 @@ private:
 };
 
 // 바닥.
+// [JA] 床。
 UCLASS(NotPlaceable)
 class ABH_Ground : public AActor
 {
@@ -41,6 +43,7 @@ public:
 };
 
 // 밀거나 떨어뜨릴 수 있는 나무 상자. 레벨 디자이너가 쓰는 StaticMeshActor 를 그대로 물려받았다.
+// [JA] 押したり落としたりできる木箱。レベルデザイナーが使う StaticMeshActor をそのまま継承した。
 UCLASS(NotPlaceable)
 class ABH_WoodCrate : public AStaticMeshActor
 {

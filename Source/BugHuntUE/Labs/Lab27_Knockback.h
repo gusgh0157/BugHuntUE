@@ -7,6 +7,7 @@
 class UBoxComponent;
 
 // 망치에 맞으면 뒤로 밀려나는 거한.
+// [JA] ハンマーで殴られると後ろへ押し飛ばされる巨漢。
 UCLASS(NotPlaceable)
 class ABH_Brute : public AActor
 {
@@ -22,6 +23,7 @@ public:
 };
 
 // 성벽.
+// [JA] 城壁。
 UCLASS(NotPlaceable)
 class ABH_CastleWall : public AActor
 {

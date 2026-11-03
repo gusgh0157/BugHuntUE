@@ -19,6 +19,7 @@ private:
 };
 
 // 퀘스트를 주는 NPC. 게임 내내 퀘스트 기록을 들고 있다.
+// [JA] クエストを渡す NPC。ゲーム中ずっとクエスト記録を持っている。
 UCLASS(NotPlaceable)
 class ABH_QuestGiver : public AActor
 {

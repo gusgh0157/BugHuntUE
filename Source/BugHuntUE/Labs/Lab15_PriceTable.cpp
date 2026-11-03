@@ -38,6 +38,7 @@ void ABH_Lab15::StartLab()
 		{
 			Bag.Add(Sellable[BugHunt::CaseInt(0, 0, UE_ARRAY_COUNT(Sellable) - 1)]);
 		}
+	// [JA] 公開入力: 薬草、毛皮、王の手紙（クエストアイテム）、鉱石、宝石
 		Bag.Insert(TEXT("KingsLetter"), BugHunt::CaseInt(0, 0, Bag.Num()));
 		Bag.Insert(TEXT("OldMap"), BugHunt::CaseInt(0, 0, Bag.Num()));
 	}
@@ -62,18 +63,29 @@ void ABH_Lab15::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // "Assertion failed: Pair != nullptr" 같은 줄에서 멈춥니다. 엔진 프레임(TMapBase::FindChecked) 아래로 내려가
 // 처음 나오는 BugHuntUE.dll! 프레임을 보세요. 지역 창의 Item 은 무엇인가요? Prices 를 펼쳐 그 키가 있나요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // TMap 의 operator[] 는 std::map 과 다릅니다. std::map 은 없는 키를 만들어 넣지만, TMap 의 [] 는 FindChecked 와 같아서
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 없는 키면 check 로 프로그램을 멈춥니다. "있다고 확신하는 키"에만 씁니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 없을 수도 있는 키는 Find 로 찾고 nullptr 를 확인합니다.
+
+// [JA] "Assertion failed: Pair != nullptr" のような行で止まります。エンジンのフレーム（TMapBase::FindChecked）より下へたどり、
+// [JA] 最初に出てくる BugHuntUE.dll! のフレームを見てください。ローカル ウィンドウの Item は何ですか？ Prices を展開すると、そのキーはありますか？
 //     if (const int32* Price = Prices.Find(Item)) { Total += *Price; } else { ++Refused; }
 // 기본값이 있으면 Prices.FindRef(Item) (없으면 0), 없으면 새로 넣으려면 FindOrAdd.
 #pragma endregion
+
+// [JA] TMap の operator[] は std::map とは違います。std::map はないキーを作って入れますが、TMap の [] は FindChecked と同じで、
+// [JA] ないキーなら check でプログラムを止めます。「あると確信しているキー」にだけ使います。
+
+// [JA] ないかもしれないキーは Find で探して nullptr を確認します。
+// [JA]     if (const int32* Price = Prices.Find(Item)) { Total += *Price; } else { ++Refused; }
+// [JA] 既定値があるなら Prices.FindRef(Item)（なければ 0）、なければ新しく入れたいなら FindOrAdd。

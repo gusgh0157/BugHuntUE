@@ -1,5 +1,7 @@
 // [주의] 이 랩은 소리를 냅니다. 실행 전에 시스템 볼륨을 낮추고, 헤드폰을 쓴다면 귀에서 떼고 시작하세요.
 //        (실습용 소리는 볼륨 배율 0.5 로 재생합니다.)
+// [JA] [注意] このラボは音が出ます。実行前にシステムの音量を下げ、ヘッドホンを使っている場合は耳から離してから始めてください。
+// [JA]        （実習用の音は音量倍率 0.5 で再生します。）
 
 #include "Labs/Lab31_AlarmBell.h"
 #include "Core/BugHuntReport.h"
@@ -53,6 +55,7 @@ void ABH_Lab31::StartLab()
 	}
 	if (GetNetMode() == NM_Standalone)
 	{
+// [JA] 以下はサーバーで動くシナリオです。
 		BugHunt::Note(TEXT("스탠드얼론에서는 통과합니다. 리슨 서버 + 클라이언트로 실행하세요 (README 9부)."));
 	}
 
@@ -74,21 +77,35 @@ void ABH_Lab31::StartLab()
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
+		// [JA] 鐘がクライアントにレプリケーションされる時間を与えてから鳴らす。
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // PIE를 Number of Players 2, Play As Listen Server 로 실행하고 서버 창에서 BugHunt.Lab 31.
 // 귀로 확인하기는 어렵습니다(PIE 창들이 한 스피커를 같이 쓰고, 포커스 없는 창은 소리가 줄어들 수 있습니다). 로그로 확인하세요.
 // Output Log에서 "땡!" 줄 앞의 꼬리표가 [리슨 서버]뿐인지 보세요.
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // PlayRingSound 에 중단점 → 멈출 때마다 조사식에 GetNetMode(). 클라이언트에서 한 번이라도 멈추나요?
 // UGameplayStatics::PlaySoundAtLocation 은 "그 함수를 부른 머신"의 스피커에서만 소리를 냅니다. 소리는 복제되지 않습니다.
 #pragma endregion
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 서버에서 일어난 일을 모든 머신에서 "연출"(소리, 파티클)하려면 NetMulticast RPC 로 각 머신에서 재생하게 합니다.
 //     UFUNCTION(NetMulticast, Unreliable) void Multicast_PlayRing();
 // (연출은 하나쯤 빠져도 되므로 보통 Unreliable. 서버에서 부르면 서버 자신에서도 실행됩니다.)
 // 데디케이티드 서버라면 지금 코드로는 아무도 못 듣습니다. 서버에는 스피커가 없으니까요.
+
+// [JA] PIE を Number of Players 2、Play As Listen Server で実行し、サーバーのウィンドウで BugHunt.Lab 31。
+// [JA] 耳で確かめるのは難しいです（PIE ウィンドウどうしが 1 つのスピーカーを共有し、フォーカスのないウィンドウは音が小さくなることがあります）。ログで確認してください。
+// [JA] アウトプットログで「カーン！」の行の前のタグが [リッスンサーバー] だけかどうか見てください。
 #pragma endregion
+
+// [JA] PlayRingSound にブレークポイント → 止まるたびにウォッチに GetNetMode()。クライアントで一度でも止まりますか？
+// [JA] UGameplayStatics::PlaySoundAtLocation は「その関数を呼んだマシン」のスピーカーからしか音を出しません。音はレプリケーションされません。
+
+// [JA] サーバーで起きたことをすべてのマシンで「演出」（音、パーティクル）するには、NetMulticast RPC で各マシンで再生させます。
+// [JA]     UFUNCTION(NetMulticast, Unreliable) void Multicast_PlayRing();
+// [JA] （演出は 1 つくらい抜けても構わないので普通は Unreliable。サーバーで呼ぶとサーバー自身でも実行されます。）
+// [JA] デディケイテッドサーバーなら、今のコードでは誰も聞こえません。サーバーにはスピーカーがないからです。

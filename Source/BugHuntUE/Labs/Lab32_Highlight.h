@@ -7,6 +7,7 @@
 class UStaticMeshComponent;
 
 // 상자: 마우스를 올리면 빨갛게 강조된다. 모든 상자는 같은 머티리얼 에셋(BasicShapeMaterial)을 쓴다.
+// [JA] 箱: マウスを乗せると赤くハイライトされる。すべての箱は同じマテリアル アセット（BasicShapeMaterial）を使う。
 UCLASS(NotPlaceable)
 class ABH_Crate : public AActor
 {
@@ -18,6 +19,7 @@ public:
 	void SetHighlighted(bool bOn);
 
 	// 지금 이 상자 화면에 칠해지는 색 (머티리얼의 Color 파라미터)
+	// [JA] 今この箱が画面に塗られている色（マテリアルの Color パラメーター）
 	FLinearColor GetDisplayedColor() const;
 
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")

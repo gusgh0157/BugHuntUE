@@ -5,6 +5,7 @@
 #include "Lab18_FogOfWar.generated.h"
 
 // 전장의 안개: 밝혀진 칸 좌표를 TSet 에 모은다. Source 는 디버그용 (누가 이 칸을 밝혔나).
+// [JA] 戦場の霧: 明らかになったマスの座標を TSet に集める。Source はデバッグ用（誰がこのマスを明らかにしたか）。
 struct FBH_CellKey
 {
 	int32 X = 0;
@@ -12,6 +13,7 @@ struct FBH_CellKey
 	FString Source;
 
 	// 같은 좌표면 같은 칸
+	// [JA] 座標が同じなら同じマス
 	bool operator==(const FBH_CellKey& Other) const
 	{
 		return X == Other.X && Y == Other.Y;

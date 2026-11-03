@@ -8,6 +8,7 @@ class USphereComponent;
 class UBoxComponent;
 
 // 저격총 탄환. 물리로 날아가고, 무언가에 부딪히면 Hits 를 센다.
+// [JA] 狙撃銃の弾丸。物理で飛び、何かにぶつかると Hits を数える。
 UCLASS(NotPlaceable)
 class ABH_SniperRound : public AActor
 {
@@ -29,6 +30,7 @@ private:
 };
 
 // 얇은 철판 과녁.
+// [JA] 薄い鉄板の的。
 UCLASS(NotPlaceable)
 class ABH_SteelPlate : public AActor
 {

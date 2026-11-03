@@ -66,19 +66,31 @@ void ABH_Lab47::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 일렁임은 맞는데 Tick 이 너무 많이 불립니다. 콘솔 dumpticks 로 지금 등록된 틱 함수 목록과 개수를 보세요(랩 실행 중에).
 // stat game 의 "Tick Time", stat unit 의 Game 도 같이 보세요. 횃불 하나는 가볍지만 수백 개가 매 프레임 불리면 어떨까요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // 이 횃불이 실제로 하는 일은 0.5초에 한 번입니다. 나머지 Tick 은 시간을 더하고 비교만 합니다.
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // "매 프레임 할 일이 없는 액터는 Tick 을 끈다" 가 기본입니다. 주기적으로 할 일이 있으면 그 주기로만 불리게 합니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 방법 1: 타이머. 생성자에서 PrimaryActorTick.bCanEverTick = false; 하고
+
+// [JA] 揺らめきは合っていますが、Tick が呼ばれすぎています。コンソールの dumpticks で、今登録されている Tick 関数の一覧と数を見てください（ラボの実行中に）。
+// [JA] stat game の "Tick Time"、stat unit の Game も一緒に見てください。たいまつ 1 本は軽いですが、数百本が毎フレーム呼ばれたらどうでしょう？
 //     BeginPlay: GetWorldTimerManager().SetTimer(FlickerHandle, this, &ABH_Torch::Flicker, 0.5f, true);
 // 방법 2: 틱 간격. PrimaryActorTick.TickInterval = 0.5f; (Tick 의 DeltaSeconds 가 0.5 가 된다)
 // 수천 개라면 매니저 하나가 전부를 돌리거나(배열 순회가 액터별 Tick 보다 훨씬 쌈), Significance Manager 로 멀리 있는 것은 덜 자주 돌립니다.
 #pragma endregion
+
+// [JA] このたいまつが実際に仕事をするのは 0.5 秒に 1 回です。残りの Tick は時間を足して比べるだけです。
+// [JA] 「毎フレームやることがないアクターは Tick をオフにする」が基本です。定期的にやることがあるなら、その周期でだけ呼ばれるようにします。
+
+// [JA] 方法 1: タイマー。コンストラクタで PrimaryActorTick.bCanEverTick = false; にして
+// [JA]     BeginPlay: GetWorldTimerManager().SetTimer(FlickerHandle, this, &ABH_Torch::Flicker, 0.5f, true);
+// [JA] 方法 2: Tick 間隔。PrimaryActorTick.TickInterval = 0.5f;（Tick の DeltaSeconds が 0.5 になる）
+// [JA] 数千本なら、マネージャー 1 つが全部を回すか（配列の走査はアクターごとの Tick よりずっと安い）、Significance Manager で遠くにあるものは回す頻度を下げます。

@@ -5,6 +5,7 @@
 #include "Lab46_AimPreview.generated.h"
 
 // 수류탄 조준선: 매 프레임 포물선 위의 점들을 계산해서 그린다.
+// [JA] グレネードの照準線: 毎フレーム放物線上の点を計算して描く。
 UCLASS(NotPlaceable)
 class ABH_AimPreview : public AActor
 {
@@ -18,6 +19,7 @@ public:
 	FVector ThrowVelocity = FVector(800.f, 0.f, 600.f);
 
 	// 그리기용 결과
+	// [JA] 描画用の結果
 	int32 LastNumPoints = 0;
 	FVector LastLanding = FVector::ZeroVector;
 };

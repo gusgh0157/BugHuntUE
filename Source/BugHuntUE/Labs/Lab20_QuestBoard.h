@@ -6,6 +6,7 @@
 #include "Lab20_QuestBoard.generated.h"
 
 // 퀘스트 하나의 진행도. FastArraySerializer 원소라서 바뀐 원소만 클라이언트로 보낸다.
+// [JA] クエスト 1 つの進行度。FastArraySerializer の要素なので、変わった要素だけをクライアントへ送る。
 USTRUCT()
 struct FBH_QuestEntry : public FFastArraySerializerItem
 {
@@ -39,6 +40,7 @@ struct TStructOpsTypeTraits<FBH_QuestList> : public TStructOpsTypeTraitsBase2<FB
 };
 
 // 마을 게시판: 모든 플레이어가 같은 퀘스트 진행도를 본다.
+// [JA] 村の掲示板: すべてのプレイヤーが同じクエスト進行度を見る。
 UCLASS(NotPlaceable)
 class ABH_QuestBoard : public AActor
 {

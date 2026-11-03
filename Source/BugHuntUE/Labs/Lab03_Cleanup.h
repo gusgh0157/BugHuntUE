@@ -18,6 +18,7 @@ public:
 };
 
 // 웨이브가 끝나면 죽은 적을 목록에서 빼고 월드에서 지운다.
+// [JA] ウェーブが終わったら、死んだ敵をリストから外してワールドから消す。
 UCLASS(NotPlaceable)
 class ABH_WaveManager : public AActor
 {

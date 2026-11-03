@@ -50,6 +50,7 @@ void ABH_Lab05::StartLab()
 		BugHunt::Note(FString::Printf(TEXT("전투 기록: %s"), *Line));
 	}
 	BugHunt::Expect(TEXT("다시 연 창의 기록 줄 수"), 1, Panel->Lines.Num());
+	// [JA] ウィンドウが閉じているときに受けたダメージは記録しない。
 	BugHunt::Expect(FString::Printf(TEXT("띄운 알림 총합 (%d, %d)"), First, Second), 2, Panel->NotificationsShown);
 	BugHunt::Expect(TEXT("기사 HP"), 100 - First - WhileClosed - Second, Knight->Health);
 	FinishLab();
@@ -59,20 +60,33 @@ void ABH_Lab05::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 크래시가 없습니다. HandleDamaged 에 중단점을 걸고 F5 를 누를 때마다 지역 창의 Damage 를 적으세요.
 // 기대: 10, 7 (두 번). 실제로는 몇 번, 어떤 값으로 멈추나요?
 // 멈출 때마다 호출 스택 두 번째 줄 아래의 ABH_Fighter::TakeHit 프레임을 보면 어느 TakeHit 호출인지 알 수 있습니다.
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 중단점을 우클릭 → 작업(Actions)으로 바꿔서 "HandleDamaged {Damage} 받음" 을 출력하고 "실행 계속"을 체크하면
 // 멈추지 않고 출력 창에 순서가 남습니다. (추적점)
 // ABH_Fighter::TakeHit 의 Broadcast 줄에서 조사식에 OnDamaged 를 넣고 펼쳐 보세요.
 // InvocationList 안에 등록된 함수가 몇 개 있나요? 처음, Close 뒤, 다시 Open 뒤를 비교하세요.
 #pragma endregion
 
-#pragma region 힌트 3
+
+// [JA] クラッシュはしません。HandleDamaged にブレークポイントを設定し、F5 を押すたびにローカル ウィンドウの Damage を書き留めてください。
+// [JA] 期待: 10, 7（2 回）。実際には何回、どんな値で止まりますか？
+// [JA] 止まるたびに呼び出し履歴の 2 行目より下の ABH_Fighter::TakeHit フレームを見ると、どの TakeHit 呼び出しなのかがわかります。
+#pragma region 힌트 3 / ヒント 3
 // AddUObject 는 객체가 살아 있는 한 계속 불립니다. 창을 닫는다고 자동으로 빠지지 않습니다.
 // Open 에서 Add 했다면 Close 에서는? (RemoveAll(this) 또는 Add 가 돌려주는 FDelegateHandle 로 Remove)
 #pragma endregion
+
+// [JA] ブレークポイントを右クリック → アクション（Actions）に切り替えて "HandleDamaged {Damage} 受けた" を出力し、「実行の継続」にチェックを入れると
+// [JA] 止まらずに出力 ウィンドウに順番が残ります。（トレースポイント）
+// [JA] ABH_Fighter::TakeHit の Broadcast の行で、ウォッチに OnDamaged を入れて展開してみてください。
+// [JA] InvocationList の中に登録された関数はいくつありますか？ 最初、Close の後、もう一度 Open した後を比べてください。
+
+// [JA] AddUObject はオブジェクトが生きている限り呼ばれ続けます。ウィンドウを閉じても自動では外れません。
+// [JA] Open で Add したなら、Close では？（RemoveAll(this)、または Add が返す FDelegateHandle で Remove）

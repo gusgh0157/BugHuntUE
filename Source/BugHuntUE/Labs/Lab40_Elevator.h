@@ -7,6 +7,7 @@
 DECLARE_MULTICAST_DELEGATE(FBH_OnElevatorArrived);
 
 // 엘리베이터: 부르면 매 Tick 마다 Speed 만큼 올라와서 도착하면 bArrived 를 켜고 OnArrived 를 방송한다.
+// [JA] エレベーター: 呼ぶと Tick ごとに Speed ずつ上がってきて、到着すると bArrived をオンにして OnArrived をブロードキャストする。
 UCLASS(NotPlaceable)
 class ABH_Elevator : public AActor
 {
@@ -36,6 +37,7 @@ private:
 };
 
 // 승객: 엘리베이터를 부르고, 도착하면 탄다.
+// [JA] 乗客: エレベーターを呼び、到着したら乗る。
 UCLASS(NotPlaceable)
 class ABH_Passenger : public AActor
 {
@@ -48,6 +50,7 @@ public:
 	bool bBoarded = false;
 
 	// 탈 때 엘리베이터가 도착해 있었나
+	// [JA] 乗るときにエレベーターが到着していたか
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	bool bElevatorWasThere = false;
 

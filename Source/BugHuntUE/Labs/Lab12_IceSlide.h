@@ -5,6 +5,7 @@
 #include "Lab12_IceSlide.generated.h"
 
 // 얼음 위의 돌: 밀면 미끄러지다가 마찰로 멈춘다.
+// [JA] 氷の上の石: 押すと滑り、摩擦で止まる。
 UCLASS(NotPlaceable)
 class ABH_IceStone : public AActor
 {
@@ -17,7 +18,9 @@ public:
 	void Push(float Speed) { Velocity = Speed; }
 
 	float Velocity = 0.f;          // 초당 cm
+	// [JA] 毎秒 cm
 	float Friction = 0.9f;         // 기획자가 60fps 에서 손으로 맞춘 값
+	// [JA] プランナーが 60fps で手作業で合わせた値
 };
 
 UCLASS(NotPlaceable)

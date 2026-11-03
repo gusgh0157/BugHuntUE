@@ -5,6 +5,7 @@
 #include "Lab13_RoundStats.generated.h"
 
 // 한 라운드의 플레이어 기록.
+// [JA] 1 ラウンド分のプレイヤーの記録。
 USTRUCT()
 struct FBH_RoundStats
 {
@@ -21,6 +22,7 @@ struct FBH_RoundStats
 };
 
 // 라운드 점수판. 라운드마다 기록을 새로 시작한다.
+// [JA] ラウンドのスコアボード。ラウンドごとに記録を新しく始める。
 UCLASS(NotPlaceable)
 class ABH_RoundBoard : public AActor
 {

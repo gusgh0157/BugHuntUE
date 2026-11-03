@@ -4,6 +4,12 @@
 // 검사 방법: Explode() 가 돌려준 UAudioComponent 를 0.1초 뒤에 보고 "아직 재생 중인가"를 판정합니다.
 // 그래서 고칠 때도 Explode() 는 재생 중인 컴포넌트를 돌려줘야 합니다. 컴포넌트를 돌려주지 않는 함수
 // (UGameplayStatics::PlaySoundAtLocation 등)로 바꾸면 소리는 제대로 나도 검사가 확인할 수 없어 FAIL 입니다.
+// [JA] [注意] このラボは音が出ます。実行前にシステムの音量を下げ、ヘッドホンを使っている場合は耳から離してから始めてください。
+// [JA]        （実習用の音は音量倍率 0.5 で再生します。）
+// [JA]
+// [JA] 検査方法: Explode() が返した UAudioComponent を 0.1 秒後に見て、「まだ再生中か」を判定します。
+// [JA] そのため、直すときも Explode() は再生中のコンポーネントを返す必要があります。コンポーネントを返さない関数
+// [JA] （UGameplayStatics::PlaySoundAtLocation など）に変えると、音は正しく鳴っても検査が確認できず FAIL になります。
 
 #include "Labs/Lab30_Explosion.h"
 #include "Core/BugHuntReport.h"
@@ -50,6 +56,7 @@ void ABH_Lab30::StartLab()
 		FinishLab();
 		return;
 	}
+		// [JA] （実習用: 音を小さくしておく。バグとは関係ない）
 
 	// 검사 환경 고정: 엔진은 1초 이하의 짧은 소리가 들을 수 없는 위치(리스너 밖)면 컴포넌트를 아예 만들지 않는다.
 	// 카메라 위치나 헤드리스 실행에 결과가 흔들리지 않도록 이 최적화를 끈다. (버그와는 상관없음)
@@ -72,6 +79,8 @@ void ABH_Lab30::StartLab()
 			Audio.IsValid() ? TEXT("살아 있음") : TEXT("사라짐"), bStillPlaying ? TEXT("예") : TEXT("아니오"));
 		BugHunt::ExpectTrue(TEXT("0.1초 뒤에도 폭발음이 재생 중"), bStillPlaying);
 		FinishLab();
+	// [JA] 検査環境の固定: エンジンは 1 秒以下の短い音が聞こえない位置（リスナーの範囲外）にあると、コンポーネントをそもそも作らない。
+	// [JA] カメラ位置やヘッドレス実行で結果がぶれないよう、この最適化をオフにする。（バグとは関係ない）
 	});
 }
 
@@ -79,21 +88,35 @@ void ABH_Lab30::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 오디오 컴포넌트는 만들어졌는데 0.1초 뒤에 사라졌습니다. 누가 지웠을까요?
 // Explode 의 Destroy() 줄에 중단점을 걸고, 넘기기 전에 조사식에 Audio->GetOwner() 와 Audio->GetAttachParent() 를 넣어 보세요.
 // 콘솔: au.Debug.Sounds 1 (화면에 지금 재생 중인 소리 목록), stat soundwaves, au.3dVisualize.Enabled 1 (소리 위치 표시)
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // SpawnSoundAttached 는 오디오 컴포넌트를 "붙인 대상의 액터"에 만듭니다. 액터가 파괴되면 그 액터의 컴포넌트도 함께 파괴되고,
 // 컴포넌트가 파괴되면 재생 중이던 소리도 멈춥니다. Destroy() 다음 프레임부터는 소리가 없습니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 액터보다 오래 살아야 하는 소리는 액터에 붙이지 않습니다. 그 자리에서 울리고 끝나는 소리는 어느 함수로 재생할까요?
 // (UGameplayStatics::SpawnSoundAtLocation. 또는 액터를 바로 지우지 말고 숨긴 뒤 SetLifeSpan)
 // 함정 하나 더: SpawnSoundAtLocation(this, ...) 처럼 첫 인자(WorldContextObject)에 곧 사라질 액터를 넘기면,
 // 엔진은 그 액터를 컴포넌트의 주인으로 삼습니다. 고친 뒤에도 로그의 "폭발음 컴포넌트" 경로에 누가 들어 있는지 확인하세요.
 // 검사는 Explode() 가 돌려준 컴포넌트를 봅니다. PlaySoundAtLocation 은 컴포넌트를 돌려주지 않으므로, 소리는 나도 검사는 FAIL 입니다.
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 #pragma endregion
+
+// [JA] オーディオコンポーネントは作られたのに、0.1 秒後に消えていました。誰が消したのでしょう？
+// [JA] Explode の Destroy() の行にブレークポイントを設定し、ステップで進む前にウォッチに Audio->GetOwner() と Audio->GetAttachParent() を入れてみてください。
+// [JA] コンソール: au.Debug.Sounds 1（画面に今再生中の音の一覧）、stat soundwaves、au.3dVisualize.Enabled 1（音の位置を表示）
+
+// [JA] SpawnSoundAttached はオーディオコンポーネントを「アタッチ先のアクター」に作ります。アクターが破棄されると、そのアクターのコンポーネントも一緒に破棄され、
+// [JA] コンポーネントが破棄されると再生中だった音も止まります。Destroy() の次のフレームからは音がありません。
+
+// [JA] アクターより長く生きるべき音は、アクターにアタッチしません。その場で鳴って終わる音は、どの関数で再生するでしょう？
+// [JA] （UGameplayStatics::SpawnSoundAtLocation。またはアクターをすぐに消さず、隠してから SetLifeSpan）
+// [JA] 落とし穴をもう 1 つ: SpawnSoundAtLocation(this, ...) のように第 1 引数（WorldContextObject）にもうすぐ消えるアクターを渡すと、
+// [JA] エンジンはそのアクターをコンポーネントの持ち主にします。直した後も、ログの「爆発音のコンポーネント」のパスに誰が入っているか確認してください。
+// [JA] 検査は Explode() が返したコンポーネントを見ます。PlaySoundAtLocation はコンポーネントを返さないので、音は鳴っても検査は FAIL です。

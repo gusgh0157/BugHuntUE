@@ -5,6 +5,7 @@
 #include "Lab43_ScoreFeed.generated.h"
 
 // 화면 오른쪽 위의 점수판. UObject 라서 게임 스레드에서만 만질 수 있다.
+// [JA] 画面右上のスコアボード。UObject なのでゲームスレッドでしか触れない。
 UCLASS(NotPlaceable)
 class ABH_ScoreFeed : public AActor
 {

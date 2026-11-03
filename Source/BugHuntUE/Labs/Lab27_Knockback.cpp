@@ -40,6 +40,7 @@ void ABH_Lab27::StartLab()
 
 	After(0.1f, [this, Brute, WallX, Distance]
 	{
+	// [JA] デフォルトマップの床やプレイヤーから離れた、何もない空中で実験する。
 		Brute->Knockback(FVector(1.f, 0.f, 0.f), Distance);
 		const float WallFront = WallX - 20.f;
 		const float BruteBack = Brute->GetActorLocation().X + 40.f;
@@ -53,20 +54,33 @@ void ABH_Lab27::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 거한이 성벽 너머에 서 있습니다. 둘 다 BlockAll 인데도요. show Collision 을 켜고 넉백 직후 일시 정지해서 보세요.
 // SetActorLocation 에 F12 로 들어가 매개변수 목록을 보세요. 생략한 매개변수의 기본값은 무엇인가요?
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // 충돌 설정(Block)은 "움직이는 방법"이 충돌을 검사할 때만 의미가 있습니다. SetActorLocation(위치) 은 기본으로 순간이동입니다:
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 목적지에 그냥 놓고, 가는 길에 무엇이 있었는지는 보지 않습니다. 물리 시뮬레이션 중이 아니므로 물리가 밀어내 주지도 않습니다.
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 //     FHitResult Hit;
+
+// [JA] 巨漢が城壁の向こう側に立っています。どちらも BlockAll なのにです。show Collision をオンにし、ノックバック直後に一時停止して見てください。
+// [JA] SetActorLocation に F12 で入ってパラメーター一覧を見てください。省略したパラメーターの既定値は何ですか？
 //     SetActorLocation(Target, /*bSweep*/ true, &Hit);   // 가는 길을 쓸어서(스윕) 막히면 그 앞에서 멈춘다
 //     if (Hit.bBlockingHit) { /* 벽에 부딪힘: 스턴, 소리 */ }
 // AddActorWorldOffset, SetWorldLocation 도 같은 bSweep 매개변수가 있습니다. 캐릭터라면 LaunchCharacter 나 CharacterMovement 가
 // 스윕을 대신 해 줍니다. 스윕은 루트 컴포넌트의 모양으로만 합니다(자식 컴포넌트의 충돌은 보지 않음).
 #pragma endregion
+
+// [JA] コリジョン設定（Block）は、「動かし方」がコリジョンを調べるときにだけ意味があります。SetActorLocation(位置) は既定ではテレポートです:
+// [JA] 目的地にそのまま置くだけで、途中に何があったかは見ません。物理シミュレーション中でもないので、物理が押し戻してくれることもありません。
+
+// [JA]     FHitResult Hit;
+// [JA]     SetActorLocation(Target, /*bSweep*/ true, &Hit);   // 途中を掃引（スイープ）して、遮られたらその手前で止まる
+// [JA]     if (Hit.bBlockingHit) { /* 壁にぶつかった: スタン、サウンド */ }
+// [JA] AddActorWorldOffset、SetWorldLocation にも同じ bSweep パラメーターがあります。キャラクターなら LaunchCharacter や CharacterMovement が
+// [JA] スイープを代わりにやってくれます。スイープはルートコンポーネントの形状だけで行います（子コンポーネントのコリジョンは見ません）。

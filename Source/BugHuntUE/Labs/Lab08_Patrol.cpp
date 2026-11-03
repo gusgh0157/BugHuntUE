@@ -33,6 +33,7 @@ void ABH_Patroller::Tick(float DeltaSeconds)
 	}
 
 	const FVector Location = GetActorLocation();
+		// [JA] 直径 60、高さ 180（中心から ±90）
 	const FVector Target = Waypoints[TargetIndex];
 
 	// 바닥을 따라 걷는다 (위아래로는 움직이지 않음).
@@ -48,6 +49,7 @@ void ABH_Patroller::Tick(float DeltaSeconds)
 
 	if (Distance < AcceptRadius)
 	{
+	// [JA] 床に沿って歩く（上下には動かない）。
 		++WaypointsReached;
 		TargetIndex = (TargetIndex + 1) % Waypoints.Num();
 		UE_LOG(LogBugHuntPatrol, Log, TEXT("  웨이포인트 도착 -> 다음 목표 %d"), TargetIndex);
@@ -78,7 +80,7 @@ void ABH_Lab08::StartLab()
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
 // ============================================================================
 
-#pragma region 힌트 1 (먼저 직접 추적해 보고 펼치세요)
+#pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 매 프레임 도는 코드라 F10 으로 따라가기 힘듭니다. Visual Logger 로 "녹화"해서 되감아 보세요.
 //   1) 에디터 메뉴 Tools → Debug → Visual Logger 를 열고 Start(녹화) 버튼을 누른다.
 //   2) PIE 실행 → 콘솔에 BugHunt.Lab 8 → 5초 기다린 뒤 Stop.
@@ -86,12 +88,25 @@ void ABH_Lab08::StartLab()
 //      노란 원(웨이포인트, 반경), 빨간 선(남은 거리)이 그려지고, 오른쪽에 그 프레임의 로그가 나옵니다.
 #pragma endregion
 
-#pragma region 힌트 2
+#pragma region 힌트 2 / ヒント 2
 // 순찰병이 웨이포인트 바로 근처에서 앞뒤로 떨고 있는 프레임을 찾으세요. 그때 로그의 "거리"는 얼마인가요?
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 가로로는 거의 겹쳐 있는데 거리가 반경보다 큽니다. 뷰포트를 옆에서 보면 초록 점과 노란 원의 높이(Z)가 같나요?
 #pragma endregion
 
-#pragma region 힌트 3
+#pragma region 힌트 3 / ヒント 3
 // 액터 위치는 몸 중심(바닥 + HalfHeight), 웨이포인트는 바닥입니다. 3D 거리는 절대 90 아래로 내려가지 않습니다.
 // 바닥을 따라 걷는 캐릭터의 도착 판정은 높이를 빼고 해야 합니다. (FVector::Dist2D 등)
 #pragma endregion
+
+// [JA] 毎フレーム回るコードなので F10 でたどるのは大変です。Visual Logger で「録画」して巻き戻してみてください。
+// [JA]   1) エディターのメニュー ツール → デバッグ → Visual Logger を開き、Start（録画）ボタンを押す。
+// [JA]   2) プレイ（PIE）→ コンソールで BugHunt.Lab 8 → 5 秒待ってから Stop。
+// [JA]   3) タイムラインで BH_Patroller の行をクリックし、時間バーをドラッグしてみてください。ビューポートに緑の点（巡回兵）、
+// [JA]      黄色の円（ウェイポイント、半径）、赤い線（残りの距離）が描かれ、右側にそのフレームのログが出ます。
+
+// [JA] 巡回兵がウェイポイントのすぐ近くで前後に震えているフレームを探してください。そのときログの「距離」はいくつですか？
+// [JA] 水平方向にはほぼ重なっているのに、距離が半径より大きいです。ビューポートを横から見ると、緑の点と黄色の円の高さ（Z）は同じですか？
+
+// [JA] アクターの位置は体の中心（床 + HalfHeight）、ウェイポイントは床です。3D の距離は決して 90 より下がりません。
+// [JA] 床に沿って歩くキャラクターの到着判定は、高さを除いて行わなければなりません。（FVector::Dist2D など）

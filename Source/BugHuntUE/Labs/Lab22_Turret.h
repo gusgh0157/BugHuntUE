@@ -18,6 +18,7 @@ public:
 };
 
 // 자동 포탑: 일정한 간격으로 표적을 쏜다. 부서지면(Destroy) 더 쏘지 않아야 한다.
+// [JA] 自動砲台: 一定の間隔で標的を撃つ。壊れたら（Destroy）もう撃ってはならない。
 UCLASS(NotPlaceable)
 class ABH_Turret : public AActor
 {
