@@ -2,7 +2,7 @@
 
 [한국어](SOLUTIONS.md) | **日本語**
 
-> 注: このプロジェクトのログ・採点ツールの出力は韓国語で表示されます。この文書の出力例は日本語に訳して載せています。
+> 注: この文書の出力例は日本語の出力です。ラボを日本語で実行するには `-BugHuntLang=ja`、コンソール変数 `BugHunt.Lang ja`、またはエディター/OS の言語を日本語にします (README.ja.md 参照)。
 
 # 第1部: クラッシュの追跡
 
@@ -288,7 +288,7 @@ Total += *Found;
 
 ## ラボ 16 — TMap::Find で受け取ったポインターを持ったまま新しいキーを追加
 ```
-間違った結果:     掲示板のオオカミ狩りの数 期待 3、実際 2 (ログには "依頼対象 3 匹")
+間違った結果:     掲示板のオオカミ討伐数 期待 3、実際 2 (ログには "依頼対象 3 匹")
 止まった位置:     RecordHunt の ++(*TargetKills) にブレークポイント。Goblin が入る前後で TargetKills のアドレスと
                Kills を展開した Wolf 要素のアドレスを比べる → Goblin (5 種類目) の後で食い違う
 本当の原因:       Find がくれた int32* はマップ内部の配列の中のアドレス。FindOrAdd で新しいキーが入って配列が大きくなると (ここでは
@@ -396,9 +396,9 @@ for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair : Threat)
 
 ## ラボ 22 — タイマーのラムダが this をキャプチャしたがオブジェクトに結び付いていない
 ```
-間違った結果:     標的に当たった回数 7 FAIL (期待 2)。"タレット破壊!" の後も発射 3, 4, 5... が出力される
+間違った結果:     標的に当たった回数 7 FAIL (期待 2)。"砲台破壊！" の後も発射 3, 4, 5... が出力される
 止まった位置:     Fire の条件付きブレークポイント (ShotsFired >= 3) → 呼び出し履歴 FTimerManager::Tick → ラムダ → Fire
-               ウォッチ式 this->bActorIsBeingDestroyed = true (すでに破棄されたタレット)
+               ウォッチ式 this->bActorIsBeingDestroyed = true (すでに破棄された砲台)
 本当の原因:       FTimerDelegate::CreateLambda はどの UObject にも結び付かない。アクターの EndPlay はそのアクターに結び付いた
                タイマーだけを消す (ClearAllTimersForObject)。ラムダの中の this はただのアドレス。
 ```
