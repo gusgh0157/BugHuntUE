@@ -562,3 +562,79 @@ if (TSharedPtr<FBH_DialogueNode> Up = Current ? Current->Parent.Pin() : nullptr)
 }
 ```
 **교훈:** `TSharedPtr`는 참조 수만 센다. GC 처럼 "아무도 안 닿는 고리"를 찾아 주지 않는다. 소유 방향 하나만 `TSharedPtr`/`TSharedRef`, 거꾸로 가리키는 쪽(부모, 소유자, 리스너)은 `TWeakPtr`. 크래시도 경고도 없어서 `stat memory`, `memreport -full`, LLM(`-llm`)에서 "계속 느는 숫자"로 발견되곤 한다. 이 랩처럼 생성/소멸 카운터를 두면 바로 보인다.
+
+# 8부: 멈춤 (무한루프와 데드락)
+
+## Lab 26 — 다른 액터의 Tick 이 바꿔 줄 값을 게임 스레드에서 while 로 기다림
+```
+틀린 결과:     응답 없음 (2000 ms) TIMEOUT. 탈 때 엘리베이터가 와 있었다 FAIL, 게임이 멈춘 시간 2000 ms FAIL
+멈춘 위치:     HangBudgetSeconds 30 → 모두 중단 → 스레드 창 GameThread → RideElevator 의 while
+               조사식 Elevator->Height = 0, TicksWhileMoving = 0. F5 → 모두 중단을 반복해도 그대로
+진짜 원인:     Tick 은 게임 스레드가 다음 프레임에 부른다. 게임 스레드가 while 에서 기다리는 동안 다음 프레임은 오지 않는다.
+```
+**수정:**
+```cpp
+void ABH_Passenger::RideElevator(ABH_Elevator* Elevator, float TargetHeight, float Speed)
+{
+    Elevator->Call(TargetHeight, Speed);
+    Elevator->OnArrived.AddUObject(this, &ABH_Passenger::Board, Elevator);
+}
+```
+타이머로 0.05초마다 `bArrived`를 확인해도 된다. 이미 도착해 있을 수도 있다면 `if (Elevator->bArrived) Board(Elevator); else AddUObject(...)`.
+**교훈:** 게임 스레드 코드는 "기다리는" 코드를 쓰지 않는다. 기다릴 일은 델리게이트, 타이머, Tick, 잠재 액션(Delay 노드), 코루틴(UE5 의 `UE::Tasks`/`co_await` 계열)으로 "나중에 불러 달라"로 바꾼다. `Sleep`을 넣어도 CPU 사용률만 줄 뿐 굳는 것은 같다.
+
+## Lab 27 — 너비 우선 탐색의 방문 기록이 루프 한 바퀴만 산다
+```
+틀린 결과:     성문 → 항구 PASS, 성문 → 등대 응답 없음 TIMEOUT (226,000 바퀴 넘게 돌았다)
+멈춘 위치:     HangBudgetSeconds 30 → 모두 중단 → FindPath. 조사식 Frontier.Num() 이 수십만, Visited.Num() 은 1~4
+진짜 원인:     TSet<int32> Visited 를 while 안에서 만들었다. 매 바퀴 새로 비어 있으니 이미 넣은 지점을 계속 다시 넣는다.
+               갈 수 있는 곳은 우연히 도착해서 멈추지만, 못 가는 곳은 큐가 끝없이 불어난다.
+```
+**수정:**
+```cpp
+TArray<int32> Frontier = { From };
+TMap<int32, int32> CameFrom = { { From, INDEX_NONE } };
+TSet<int32> Visited = { From };          // 탐색 전체에 하나
+while (Frontier.Num() > 0)
+{
+    ...
+    for (int32 Next : Nodes[Current].Links)
+    {
+        if (!Visited.Contains(Next)) { Visited.Add(Next); CameFrom.FindOrAdd(Next, Current); Frontier.Add(Next); }
+    }
+}
+```
+`CameFrom.Contains(Next)`로 검사해도 된다 (CameFrom 이 곧 방문 목록).
+**교훈:** 그래프 탐색이 굳는 것은 거의 항상 "못 가는 목적지 + 방문 체크 실수"다. 테스트에 **도달 불가능한 목적지**를 꼭 넣는다. 지역 변수가 어느 중괄호 안에서 만들어지는지(수명)도 같이 본다. 실제 게임에서는 탐색 노드 수에 상한을 두고(언리얼 내비메시의 `MaxSearchNodes`처럼) 넘으면 "경로 없음"으로 끝내는 것이 보통이다.
+
+## Lab 28 — 게임 스레드가 작업 스레드 결과를 동기로 기다리는데, 작업 스레드는 게임 스레드를 기다림
+```
+틀린 결과:     응답 없음 (2000 ms 기다림, 데드락 의심) TIMEOUT. 게임이 멈춘 시간 2000 ms, 저장 완료 FAIL
+멈춘 위치:     HangBudgetSeconds 30 → 모두 중단 → 병렬 스택:
+                 GameThread:  ABH_SaveSystem::AutoSave → WaitWithBudget → TFuture::WaitFor
+                 작업 스레드: AutoSave 의 람다 → Snapshot.Get() → TFuture::Get
+진짜 원인:     작업 스레드가 AsyncTask(GameThread) 로 보낸 일은 게임 스레드가 다음 프레임에 처리한다.
+               그 게임 스레드는 작업 스레드가 끝나기를 기다리고 있다. 서로를 기다린다 (데드락).
+```
+**수정:**
+```cpp
+void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
+{
+    const float Seconds = WriteSeconds;
+    const FString Text = Describe(Hero);                 // 게임 스레드에서 지금 상태를 복사
+    TWeakObjectPtr<ABH_SaveSystem> WeakThis(this);
+    Async(EAsyncExecution::ThreadPool, [Text, Seconds, WeakThis]
+    {
+        FPlatformProcess::Sleep(Seconds);                 // 디스크 쓰기
+        AsyncTask(ENamedThreads::GameThread, [Text, WeakThis]
+        {
+            if (ABH_SaveSystem* Self = WeakThis.Get())
+            {
+                Self->OnSaved(Text);
+            }
+        });
+    });
+}
+```
+스냅샷만 먼저 뜨고 `Done.Get()`을 남기면 데드락은 풀리지만 "게임이 멈춘 시간 < 50 ms"가 FAIL 이다 (디스크 쓰기 0.3초만큼 히치). 작업 스레드에서 `Hero->Gold`를 직접 읽으면 데이터 경쟁이고, 저장 직후의 +50 이 섞여 들어가 "저장 내용"이 FAIL 일 수 있다.
+**교훈:** 게임 스레드에서 `Future.Get()`, `Event->Wait()`, `FScopeLock`으로 오래 기다리지 않는다. 특히 기다리는 상대가 게임 스레드에 일을 보내는 구조(로딩, 세이브, 에셋 스트리밍 콜백)라면 그대로 데드락이다. 잠금 두 개를 서로 반대 순서로 잡는 데드락(A→B / B→A)도 병렬 스택에서 같은 모양으로 보인다: 두 스레드가 서로 상대가 쥔 것을 기다린다.

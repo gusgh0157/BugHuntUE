@@ -44,6 +44,9 @@
 #include "Labs/Lab23_Turret.h"
 #include "Labs/Lab24_PotionBelt.h"
 #include "Labs/Lab25_DialogueTree.h"
+#include "Labs/Lab26_Elevator.h"
+#include "Labs/Lab27_Pathfinding.h"
+#include "Labs/Lab28_AutoSave.h"
 
 namespace
 {
@@ -87,6 +90,10 @@ const FLabEntry GLabs[] = {
 	{ TEXT("포탑"),          TEXT("부순 포탑이 계속 쏜다"),                       [] { return ABH_Lab23::StaticClass(); } },
 	{ TEXT("물약 벨트"),     TEXT("전리품을 주운 뒤로 물약이 줄지 않는다"),       [] { return ABH_Lab24::StaticClass(); } },
 	{ TEXT("대화 트리"),     TEXT("대화가 끝나도 대화 노드가 메모리에 남는다"),   [] { return ABH_Lab25::StaticClass(); } },
+	// 8부: 멈춤 (무한루프와 데드락)
+	{ TEXT("엘리베이터"),    TEXT("엘리베이터를 부르면 게임이 굳는다"),           [] { return ABH_Lab26::StaticClass(); } },
+	{ TEXT("길찾기"),        TEXT("끊긴 다리 너머로 보내면 게임이 굳는다"),       [] { return ABH_Lab27::StaticClass(); } },
+	{ TEXT("자동 저장"),     TEXT("자동 저장할 때 게임이 굳는다"),                 [] { return ABH_Lab28::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
