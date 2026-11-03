@@ -47,6 +47,13 @@
 #include "Labs/Lab26_Elevator.h"
 #include "Labs/Lab27_Pathfinding.h"
 #include "Labs/Lab28_AutoSave.h"
+#include "Labs/Lab29_WaveRewards.h"
+#include "Labs/Lab30_PriceTable.h"
+#include "Labs/Lab31_BountyBoard.h"
+#include "Labs/Lab32_TurnOrder.h"
+#include "Labs/Lab33_FogOfWar.h"
+#include "Labs/Lab34_LootBag.h"
+#include "Labs/Lab35_QuestBoard.h"
 
 namespace
 {
@@ -94,11 +101,19 @@ const FLabEntry GLabs[] = {
 	{ TEXT("엘리베이터"),    TEXT("엘리베이터를 부르면 게임이 굳는다"),           [] { return ABH_Lab26::StaticClass(); } },
 	{ TEXT("길찾기"),        TEXT("끊긴 다리 너머로 보내면 게임이 굳는다"),       [] { return ABH_Lab27::StaticClass(); } },
 	{ TEXT("자동 저장"),     TEXT("자동 저장할 때 게임이 굳는다"),                 [] { return ABH_Lab28::StaticClass(); } },
+	// 9부: 컨테이너
+	{ TEXT("웨이브 보상"),   TEXT("보상을 받으면 크래시한다"),                     [] { return ABH_Lab29::StaticClass(); } },
+	{ TEXT("상점 시세표"),   TEXT("모르는 물건을 팔면 크래시한다"),               [] { return ABH_Lab30::StaticClass(); } },
+	{ TEXT("현상금 게시판"), TEXT("새 몬스터를 잡으면 현상금 집계가 틀린다"),     [] { return ABH_Lab31::StaticClass(); } },
+	{ TEXT("턴 순서"),       TEXT("유닛이 쓰러지면 턴 순서가 뒤섞인다"),           [] { return ABH_Lab32::StaticClass(); } },
+	{ TEXT("전장의 안개"),   TEXT("같은 칸이 여러 번 밝혀진다"),                   [] { return ABH_Lab33::StaticClass(); } },
+	{ TEXT("전리품 가방"),   TEXT("시간이 지나면 가방 속 아이템이 사라진다"),     [] { return ABH_Lab34::StaticClass(); } },
+	{ TEXT("퀘스트 게시판"), TEXT("클라이언트의 퀘스트 진행도가 0에서 멈춘다"),   [] { return ABH_Lab35::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
 // 각 부의 첫 랩 번호 (채점표의 "부" 칸)
-constexpr int32 GPartFirstLab[] = { 1, 5, 11, 13, 16, 19, 22, 26 };
+constexpr int32 GPartFirstLab[] = { 1, 5, 11, 13, 16, 19, 22, 26, 29 };
 
 int32 PartOf(int32 Number)
 {
@@ -113,7 +128,7 @@ int32 PartOf(int32 Number)
 // 서버 + 클라이언트 두 프로세스로 검사하는 랩
 bool IsNetworkedLab(int32 Number)
 {
-	return Number == 11 || Number == 12 || Number == 15;
+	return Number == 11 || Number == 12 || Number == 15 || Number == 35;
 }
 
 // 실제 GPU 렌더링 결과를 읽어야 판정되는 랩. 지금은 없다 (README 5부 참고). 생기면 채점기가 SKIP 한다.

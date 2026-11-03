@@ -638,3 +638,112 @@ void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
 ```
 스냅샷만 먼저 뜨고 `Done.Get()`을 남기면 데드락은 풀리지만 "게임이 멈춘 시간 < 50 ms"가 FAIL 이다 (디스크 쓰기 0.3초만큼 히치). 작업 스레드에서 `Hero->Gold`를 직접 읽으면 데이터 경쟁이고, 저장 직후의 +50 이 섞여 들어가 "저장 내용"이 FAIL 일 수 있다.
 **교훈:** 게임 스레드에서 `Future.Get()`, `Event->Wait()`, `FScopeLock`으로 오래 기다리지 않는다. 특히 기다리는 상대가 게임 스레드에 일을 보내는 구조(로딩, 세이브, 에셋 스트리밍 콜백)라면 그대로 데드락이다. 잠금 두 개를 서로 반대 순서로 잡는 데드락(A→B / B→A)도 병렬 스택에서 같은 모양으로 보인다: 두 스레드가 서로 상대가 쥔 것을 기다린다.
+
+# 9부: 컨테이너
+
+## Lab 29 — 1부터 세는 웨이브 번호를 그대로 인덱스로 씀
+```
+틀린 결과:     웨이브 4 보상까지 받고 Assertion failed: (Index >= 0) & (Index < ArrayNum)  [Array.h]
+멈춘 위치:     호출 스택 Array.h 의 RangeCheck → 한 줄 위 ABH_WaveRewards::ClaimRewards. 조사식 Wave = 5, Rewards.Num() = 5
+진짜 원인:     for (Wave = 1; Wave <= NumCleared) 로 돌며 Rewards[Wave]. 웨이브 1 에 Rewards[1](두 번째 보상)을 줬고,
+               마지막 웨이브에서 Rewards[5] 로 범위를 넘었다. 로그의 골드(20, 50, 90...)도 처음부터 한 칸씩 밀려 있다.
+```
+**수정:**
+```cpp
+Gold += Rewards[Wave - 1];     // 또는 for (int32 i = 0; i < NumCleared; ++i) Gold += Rewards[i];
+```
+**교훈:** 언리얼 `TArray` 는 Development 빌드에서도 범위를 검사한다(`checkSlow` 가 아니라 `RangeCheck`). 덕분에 "가끔 쓰레기 값"이 아니라 그 자리에서 죽는다. assert 가 뜨면 메시지 속 식(`Index < ArrayNum`)의 두 값을 먼저 조사식으로 본다. "몇 번째"(1부터)와 "인덱스"(0부터)를 섞는 곳은 변수 이름으로 구분해 둔다(`WaveNumber` / `WaveIndex`).
+
+## Lab 30 — 없는 키로 TMap::operator[]
+```
+틀린 결과:     KingsLetter 를 팔 때 Assertion failed: Pair != nullptr  [Map.h.inl, FindChecked]
+멈춘 위치:     호출 스택 FindChecked → operator[] → ABH_Shop::SellAll. 조사식 Item = KingsLetter, Prices 에 그 키 없음
+진짜 원인:     TMap::operator[] 는 FindChecked 다. std::map 처럼 기본값을 넣어 주지 않고 check 로 죽는다.
+```
+**수정:**
+```cpp
+const int32* Found = Prices.Find(Item);
+if (!Found) { ++Refused; continue; }   // 가격표에 없는 물건은 돌려준다
+Total += *Found;
+```
+없으면 0 이어도 되는 경우는 `Prices.FindRef(Item)`, 없을 때 넣고 싶으면 `Prices.FindOrAdd(Item)`.
+**교훈:** 키가 반드시 있다고 **증명할 수 있을 때만** `[]`/`FindChecked` 를 쓴다. 데이터(퀘스트 아이템, 새 DLC 아이템)가 늘면 그 증명이 깨진다. `std::map` 습관(`m[k]` 로 넣기)은 언리얼에서 정반대로 동작한다.
+
+## Lab 31 — TMap::Find 로 받은 포인터를 쥔 채 새 키 추가
+```
+틀린 결과:     게시판의 늑대 사냥 수 기대 3, 실제 2 (로그에는 "의뢰 대상 3마리")
+멈춘 위치:     RecordHunt 에서 ++(*TargetKills) 에 중단점. Goblin 이 들어오기 전후로 TargetKills 의 주소와
+               Kills 를 펼친 Wolf 원소의 주소를 비교 → Goblin(다섯 번째 종류) 뒤로 서로 다르다
+진짜 원인:     Find 가 준 int32* 는 맵 내부 배열 속 주소다. FindOrAdd 로 새 키가 들어가 배열이 커지면(여기서는
+               TInlineSetAllocator<4> 를 넘는 순간) 원소가 옮겨지고, TargetKills 는 옛 자리를 가리킨다.
+               옛 자리(인라인 버퍼)는 그대로 남아 있어서 죽지 않고, 진짜 원소만 늘지 않는다.
+```
+**수정:**
+```cpp
+for (const FName& Monster : Killed)
+{
+    ++Kills.FindOrAdd(Monster);       // 쓸 때마다 찾는다
+}
+```
+**교훈:** 랩 24 의 `TArray` 원소 참조와 같은 규칙이 `TMap`/`TSet` 에도 있다. `Find`/`FindOrAdd`/`Add` 가 준 포인터·참조는 **다음 추가나 제거 전까지만** 믿는다. 제거는 Compact 되기 전까지 자리를 비워 두지만, 그것도 보장된 것이 아니다. 미리 받아 두고 싶으면 키를 기억하고 다시 찾는다(해시 한 번은 싸다).
+
+## Lab 32 — 순서가 중요한 배열에서 RemoveAtSwap
+```
+틀린 결과:     행동 순서 기대 도적 → 기사 → 마법사 → 사제, 실제 도적 → 사제 → 기사 → 마법사
+멈춘 위치:     RemoveUnit 의 RemoveAtSwap 다음 줄. 조사식 Order 를 펼치면 마지막 원소(사제)가 빈자리(1번)로 왔다
+진짜 원인:     RemoveAtSwap/RemoveSwap 은 "마지막 원소를 빈자리로 옮기기"다. O(1) 이지만 순서를 지키지 않는다.
+```
+**수정:**
+```cpp
+Order.RemoveAt(Index);        // 뒤를 한 칸씩 당긴다. 순서 유지, O(n)
+// 값으로 지울 때는 Order.Remove(Unit) (모두 지움) / RemoveSingle(Unit) (처음 하나)
+```
+**교훈:** `RemoveAtSwap` 은 순서가 의미 없는 모음(스폰된 총알 목록 등)에만 쓴다. 정렬된 배열, 턴 순서, UI 목록에 쓰면 어딘가에서 "가끔 순서가 꼬인다"로 나타난다. 이름에 `Swap` 이 들어간 함수는 무엇과 무엇을 바꾸는지 한 번 생각한다. 5명짜리 배열에서 O(n) 은 비용이 아니다.
+
+## Lab 33 — operator== 는 좌표만, GetTypeHash 는 Source 까지 봄
+```
+틀린 결과:     밝혀진 칸 수 기대 7, 실제 8 / (0,0) 은 밝혀졌다 FAIL / (2,3) 은 밝혀졌다 FAIL
+멈춘 위치:     조사식 Revealed 를 펼치면 (2,0) 이 Source 만 다른 채로 두 번 들어 있다.
+               IsRevealed(0,0) 은 Source 가 빈 키로 찾는다 → 해시가 달라 다른 버킷을 본다
+진짜 원인:     TSet/TMap 은 GetTypeHash 로 버킷을 고른 뒤 그 안에서만 == 로 비교한다.
+               "a == b 이면 Hash(a) == Hash(b)" 가 깨지면 같은 키가 다른 버킷에 들어가 중복되고, 찾지도 못한다.
+```
+**수정:**
+```cpp
+friend uint32 GetTypeHash(const FBH_CellKey& Key)
+{
+    return HashCombine(GetTypeHash(Key.X), GetTypeHash(Key.Y));   // == 이 보는 필드만
+}
+```
+더 좋은 방법은 키에서 Source 를 빼고 `TMap<FIntPoint, FString>` 으로 바꾸는 것(`FIntPoint` 는 해시와 == 가 이미 맞다).
+**교훈:** 해시 키 구조체는 `operator==` 와 `GetTypeHash` 를 **같은 필드로, 나란히** 작성한다. 키 필드를 넣은 뒤에 바꾸는 것도 같은 버그다(옛 해시의 버킷에 남는다). 바꿔야 하면 빼고 다시 넣는다. 조회가 "가끔" 실패하면 해시를 의심한다.
+
+## Lab 34 — UPROPERTY 없는 TArray<UObject*>
+```
+틀린 결과:     GC 뒤에도 살아 있는 가방 속 아이템 기대 3, 실제 0 / 최근 본 목록의 유효한 아이템 기대 3, 실제 0
+멈춘 위치:     CollectGarbage 뒤에 중단점. obj list class=BH_LootItem 이 GC 전 4개, 후 0개. Bag->Items 원소는 주소만 남았다
+진짜 원인:     Items 에 UPROPERTY 가 없어서 GC 가 배열 속 포인터를 모른다. 아이템을 붙잡는 참조가 하나도 없으니 전부 수거됐다.
+               (Outer 가 가방이어도 붙잡아 주지 않는다. Outer 는 이름과 경로일 뿐 참조가 아니다.)
+               RecentlySeen(TWeakObjectPtr) 은 제대로 동작했다: 객체가 사라지자 무효가 됐을 뿐이다.
+```
+**수정:**
+```cpp
+UPROPERTY()
+TArray<TObjectPtr<UBH_LootItem>> Items;
+```
+**교훈:** 랩 4 의 규칙은 컨테이너에도 그대로다. UObject 를 담는 `TArray`/`TMap`/`TSet` 은 `UPROPERTY()` 를 붙이거나(UObject 멤버), `AddReferencedObjects`/`FGCObject` 로 알린다(UObject 가 아닌 클래스). 붙잡을 생각이 없는 목록은 `TWeakObjectPtr` 로 들고 쓸 때 `IsValid`. 원소 타입은 `TObjectPtr<>` 로 쓰는 것이 UE5 규칙이다(에디터 빌드에서 접근 추적).
+
+## Lab 35 — FastArraySerializer 원소를 바꾸고 MarkItemDirty 를 안 함
+```
+틀린 결과:     [리슨 서버] 진행도 3, 5 PASS / [클라이언트] 진행도 0, 0 FAIL (퀘스트 이름 세 개는 클라이언트에 있음)
+멈춘 위치:     클라이언트 프로세스에서 GetProgress 에 중단점. Quests.Items 는 3개, Progress 는 전부 0.
+               서버에서 AddQuest 와 AddProgress 를 나란히 보면 MarkItemDirty 가 AddQuest 에만 있다
+진짜 원인:     FFastArraySerializer 는 이전 값과 비교하지 않는다. 원소마다 ReplicationKey 를 보고 "표시된 원소"만 보낸다.
+               AddQuest 는 표시했으니 처음 상태(진행도 0)는 갔고, 그 뒤의 변경은 표시가 없어 영원히 안 간다.
+```
+**수정:**
+```cpp
+Entry.Progress += Amount;
+Quests.MarkItemDirty(Entry);       // 원소를 지웠으면 Quests.MarkArrayDirty()
+```
+**교훈:** 일반 `UPROPERTY(Replicated) TArray` 는 엔진이 매번 비교해서 알아서 보낸다(대신 큰 배열이면 비싸다). `FFastArraySerializer` 는 비교를 생략하는 대가로 **바꾼 사람이 표시할 책임**을 진다. 원소를 바꾸는 함수를 한곳에 모아(이 랩의 AddProgress) 거기서만 `MarkItemDirty` 하면 빠뜨리지 않는다. 클라이언트 쪽 반응은 원소의 `PostReplicatedAdd`/`PostReplicatedChange`/`PreReplicatedRemove` 로 받는다.
