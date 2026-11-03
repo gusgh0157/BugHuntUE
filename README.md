@@ -19,7 +19,7 @@
 필요한 것: **Unreal Engine 5.8**, **Visual Studio 2022 이상**(워크로드 "C++를 사용한 게임 개발", 구성 요소 "Unreal Engine 디버거/IDE 지원") 또는 Rider.
 
 1. `BugHuntUE.uproject`를 우클릭 → **Generate Visual Studio project files**. (`BugHuntUE.sln`이 생깁니다.)
-   - 이 프로젝트의 `EngineAssociation`은 `F:\Project\Test`와 같은 엔진(5.8)을 가리킵니다. 다른 PC라면 uproject 우클릭 → **Switch Unreal Engine version...** 으로 설치된 5.8을 고르세요.
+   - `EngineAssociation`은 `5.8`입니다. 런처로 5.8을 설치했다면 uproject를 바로 열 수 있습니다. 소스 빌드 엔진을 쓴다면 uproject 우클릭 → **Switch Unreal Engine version...** 으로 그 엔진을 고르세요.
 2. `BugHuntUE.sln`을 엽니다. 솔루션 탐색기에서 **BugHuntUE**를 우클릭 → **시작 프로젝트로 설정**.
 3. 도구 모음에서 구성 **Development Editor**, 플랫폼 **Win64**.
 4. **F5**. 빌드가 끝나면 디버거가 붙은 채로 에디터가 뜹니다. (첫 실행은 셰이더 컴파일로 몇 분 걸립니다.)
