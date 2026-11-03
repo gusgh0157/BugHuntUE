@@ -40,7 +40,7 @@ BH_TEXT(OutFile,     "결과 파일: %s", "結果ファイル: %s");
 namespace
 {
 const TCHAR* GEdition = TEXT("unreal");
-const TCHAR* GVersion = TEXT("1.0");
+const int32 GVersion = 1;
 
 struct FGradeOptions
 {
@@ -383,7 +383,7 @@ int32 UBugHuntGradeCommandlet::Main(const FString& Params)
 
 	TSharedRef<FJsonObject> Report = MakeShared<FJsonObject>();
 	Report->SetStringField(TEXT("edition"), GEdition);
-	Report->SetStringField(TEXT("version"), GVersion);
+	Report->SetNumberField(TEXT("version"), GVersion);
 	Report->SetNumberField(TEXT("total"), Labs.Num());
 	Report->SetNumberField(TEXT("passed"), Passed);
 	Report->SetArrayField(TEXT("labs"), JsonLabs);

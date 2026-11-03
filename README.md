@@ -674,7 +674,7 @@ grade.bat
 - **결과 파일:** `grade-report.json` (프로젝트 폴더, 다른 BugHunt 판과 같은 형식). 랩별 로그는 `Saved/Grade/LabNN.log`, 클라이언트는 `LabNN_client.log`.
 
 ```json
-{ "edition": "unreal", "version": "1.0", "total": 48, "passed": 0,
+{ "edition": "unreal", "version": 1, "total": 48, "passed": 0,
   "labs": [ { "id": 1, "title": "회복 아이템", "part": 1, "result": "CRASH", "ms": 35800, "detail": "Unhandled Exception: EXCEPTION_ACCESS_VIOLATION ..." } ] }
 ```
 
