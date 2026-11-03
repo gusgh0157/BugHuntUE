@@ -727,6 +727,7 @@ Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바�
 | `stat fps` / `stat unit` / `stat game` | 프레임, 스레드별 ms, Tick 시간 |
 | `log 카테고리 Verbose` | 그 카테고리 로그 상세도 올리기 |
 | `showdebug` | 화면에 디버그 정보 (카메라, 입력 등) |
+| `BugHunt.Lang ko` / `BugHunt.Lang ja` | 랩·채점기 출력 언어를 실행 중에 바꾸기. 값이 비어 있으면(기본) 에디터/OS 언어를 따른다 |
 
 ## 명령줄 옵션
 
@@ -738,6 +739,7 @@ Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바�
 | `-BugHuntSeed=S` | 숨은 입력(시드 S)으로 실행 (채점기가 쓴다) |
 | `-stomp2malloc` | 해제된 메모리/범위 밖 접근을 그 자리에서 잡는 할당기 (언리얼판 ASan. UE 5.8 기본으로는 **Windows 에디터 빌드 전용**: `MallocStomp2.h` 의 `WITH_MALLOC_STOMP2 = WITH_EDITOR && PLATFORM_WINDOWS`. 게임 빌드에서는 명령줄을 줘도 아무 일도 없다). 아주 느리고 메모리를 많이 씀. `-MallocStomp2MinSize=`, `-MallocStomp2MaxSize=`로 크기 범위를 좁힐 수 있음 |
 | `-log` | 별도 로그 창 띄우기 |
+| `-BugHuntLang=ko` / `-BugHuntLang=ja` | 랩·채점기 출력 언어 (`grade.bat -BugHuntLang=ja` 도 같음). 정하는 순서: `BugHunt.Lang` 값(이 옵션이 넣고, 실행 중 콘솔로 바꾸면 그 값) → 에디터/OS 언어 → 한국어. 헤드리스 채점에서도 똑같이 나오도록 LOCTEXT 대신 소스 안의 한국어/일본어 표(`Core/BugHuntText.h`)를 쓴다. `grade-report.json` 의 키와 `result` 는 언어와 상관없이 같고 `title`/`detail` 만 바뀐다 |
 
 ## 다시 풀고 싶을 때
 
