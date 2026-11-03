@@ -12,6 +12,10 @@
 - **7부: 잘못된 포인터 (랩 22~25)**: 죽지 않는 포인터 버그. 지워진 액터를 기억하는 raw 포인터, 객체보다 오래 사는 타이머 람다, `Add` 뒤의 배열 원소 참조, `TSharedPtr` 순환 참조를 주소와 참조 수로 추적합니다.
 - **8부: 멈춤 (랩 26~28)**: 크래시 없이 게임이 굳는 무한루프와 데드락. "모두 중단", 스레드 창, 병렬 스택으로 굳은 순간을 세워 봅니다. (실습용 안전장치가 있어 에디터가 진짜로 굳지는 않습니다.)
 - **9부: 컨테이너 (랩 29~35)**: `TArray`/`TMap`/`TSet` 의 범위 검사 assert, 없는 키, 재할당 뒤의 포인터, 순서를 바꾸는 제거, 해시와 `==` 불일치, GC 와 복제(`FFastArraySerializer`)를 만난 컨테이너.
+- **10부: 프레임레이트와 초기화 (랩 36~38)**: 30fps 와 120fps 에서 다르게 움직이는 코드(`DeltaSeconds` 누락, 프레임당 감속)와 초기화 안 된 구조체 멤버.
+- **11부: 물리 (랩 39~42)**: 터널링과 CCD, 채널 응답과 Overlap 이벤트, 스윕 없는 이동, 물리 물체를 Tick 에서 옮기기. Chaos Visual Debugger 로 프레임을 되감습니다.
+- **12부: 데이터 레이스 (랩 43~44)**: 작업 스레드가 잠금 없이 같은 값을 고치거나 게임 스레드 전용 객체를 만지는 버그. 재현 확대경으로 매번 일어나게 했습니다.
+- **13부: 성능 (랩 45~48)**: Tick 마다 액터 검색, 프레임마다 배열 재할당, 수백 개의 Tick, 게임 중 동기 로드. 시간 대신 횟수로 판정합니다.
 - **채점기**: `grade.bat` 하나로 모든 랩을 헤드리스로 돌려 PASS/FAIL/TIMEOUT/CRASH/SKIP 과 점수를 냅니다. 숨은 입력으로 하드코딩을 막습니다.
 - **부록: Live Coding 함정**: "고쳤는데 그대로예요"의 단골 원인.
 
@@ -32,11 +36,11 @@
 | 이미지·렌더링 | 16, 17, 18 | MID, 비동기 로드 콜백 순서, sRGB/Linear |
 | 애니메이션 | 19, 20, 21 | 렌더 안 될 때 노티파이, 몽타주 interrupted, 노티파이 스테이트 |
 | 멈춤 (무한루프·데드락) | 26, 27, 28 | 게임 스레드 while 대기, 방문 체크 누락, Future 동기 대기 데드락 |
-| 물리 | 미포함 | |
-| 프레임레이트 의존 | 미포함 | |
-| 성능 | 미포함 | |
-| 데이터 레이스 | 미포함 | |
-| 초기화 안 된 값 | 미포함 | |
+| 물리 | 39, 40, 41, 42 | 터널링과 CCD, 채널 응답과 Generate Overlap Events, `bSweep=false` 순간이동, 시뮬레이션 물체를 Tick 에서 옮기기. (서브스테핑 차이는 설명만) |
+| 프레임레이트 의존 | 36, 37 | `DeltaSeconds` 누락, 프레임당 감속(적분), `t.MaxFPS`, 고정 시간 간격 |
+| 성능 | 45, 46, 47, 48 | Tick 마다 `GetAllActorsOfClass`, `Reserve` 누락, Tick 남발, 게임 중 동기 로드. (매 프레임 `FString` 만들기는 랩 46 힌트에서만 다룸) |
+| 데이터 레이스 | 43, 44 | `ParallelFor` 읽기-계산-쓰기 레이스, 작업 스레드에서 UObject 만지기(`check(IsInGameThread())`) |
+| 초기화 안 된 값 | 38 | 구조체 멤버 초기값 없음, `AddDefaulted` 와 남은 메모리. (지역 변수, `FMemory::Malloc` 은 설명만) |
 
 ## BugHunt 시리즈
 
@@ -46,7 +50,7 @@
 |---|---|---|
 | C++ 콘솔 | 호출 스택, 메모리 오류, 크래시 없는 흐름 추적 (랩 28개) | [BugHunt](https://github.com/gusgh0157/BugHunt) |
 | C# 콘솔 | 예외와 스택 트레이스, 흐름 추적, 비동기/동시성, 리소스와 메모리 (랩 28개) | [BugHuntCS](https://github.com/gusgh0157/BugHuntCS) |
-| 언리얼 엔진 | 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션, 잘못된 포인터, 멈춤(무한루프·데드락), 컨테이너, 채점기 (랩 35개) | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
+| 언리얼 엔진 | 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션, 잘못된 포인터, 멈춤(무한루프·데드락), 컨테이너, 프레임레이트, 초기화, 물리, 데이터 레이스, 성능, 채점기 (랩 48개) | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
 | 유니티 | 크래시/예외, 흐름 추적, 사운드, 이미지, 애니메이션 (랩 23개) | [BugHuntUnity](https://github.com/gusgh0157/BugHuntUnity) |
 
 ## 준비
@@ -483,10 +487,139 @@ LogBugHunt: [FAIL] 응답 없음 (2003 ms / 213회 초과) - 엘리베이터 기
 | 34 | 전리품 가방 | 시간이 지나면 가방 속 아이템이 사라진다 | `UPROPERTY` 없는 **`TArray<UObject*>`** 와 GC, `TArray<TObjectPtr<>>`, `TArray<TWeakObjectPtr<>>` | ★★ |
 | 35 | 퀘스트 게시판 | 클라이언트의 퀘스트 진행도가 0 에서 멈춘다 (퀘스트 이름은 보임) | **`FFastArraySerializer`** 는 비교하지 않는다, `MarkItemDirty`/`MarkArrayDirty`, 일반 복제 `TArray` 와 차이 | ★★★ |
 
-- 일곱 개 다 GPU 없이 판정됩니다(`-nullrhi` 검증 완료). 29, 30 은 CRASH 가 버그 상태입니다.
+- 일곱 개 다 GPU 없이 판정됩니다(`-nullrhi` 검증 완료). 랩 29, 30 은 CRASH 가 버그 상태입니다.
 - 랩 31 은 `TInlineSetAllocator<4>` 로 "다섯 번째 종류가 들어오는 순간"에 원소가 옮겨지게 해 두었습니다. 기본 할당기라면 언제 옮겨질지 정해져 있지 않아서, 같은 버그가 몇 시간 뒤에 엉뚱한 값으로 나타납니다.
 - 랩 33 의 키를 넣은 뒤 `X` 를 바꾸는 것도 같은 버그입니다. 원소는 옛 해시의 버킷에 남아 있어서 새 좌표로 찾으면 없고, 옛 좌표로 찾아도 `==` 가 틀려서 없습니다. 키를 바꿔야 하면 빼고 다시 넣으세요.
 - 랩 35 는 랩 11·12·15 처럼 **Number of Players 2, Play As Listen Server** 로 실행하고 서버 창에서 `BugHunt.Lab 35`. 스탠드얼론에서는 통과합니다.
+
+---
+
+# 10부: 프레임레이트와 초기화
+
+"내 PC 에선 되는데요"의 두 가지 단골 원인입니다. 하나는 **프레임레이트**(30fps 노트북과 144Hz 모니터에서 게임이 다르게 움직임), 하나는 **초기화 안 된 값**(빌드나 순서에 따라 쓰레기 값이 달라짐)입니다.
+
+## 프레임레이트를 바꿔 가며 실행하기
+
+| 도구 | 하는 법 | 언제 |
+|---|---|---|
+| `t.MaxFPS N` | 콘솔. `t.MaxFPS 30` → 실행 → `t.MaxFPS 120` → 실행 → `t.MaxFPS 0`(제한 없음) | 프레임레이트를 바꿔 같은 장면을 비교 |
+| 고정 시간 간격 | 명령줄 `-benchmark -fps=30` (코드: `FApp::SetUseFixedTimeStep(true)`, `FApp::SetFixedDeltaTime(1.0/30)`) | 실제 시간과 상관없이 매 프레임 `DeltaSeconds` 를 정확히 1/N 으로. 느린 PC 에서도 결과가 같다. 랩 36, 37 이 이 방식 (`Core/BugHuntProbe.h`) |
+| `stat fps`, `stat unit` | 콘솔 | 지금 실제 프레임레이트와 프레임 시간 |
+| 추적점 `{DeltaSeconds}` | Tick 첫 줄 | 프레임 간격이 얼마인지, Tick 이 1초에 몇 번 불리는지 |
+
+## 초기화 안 된 값
+
+| 무엇 | 처음 값 |
+|---|---|
+| UObject(액터, 컴포넌트)의 멤버 | **0** (메모리를 0 으로 채운 뒤 생성자를 부름). 그래도 초기값을 적는 것이 규칙 |
+| `USTRUCT`/일반 구조체의 멤버, 지역 변수 | **아무 값** (초기값을 안 적으면) |
+| `FMemory::Malloc`, `TArray::AddUninitialized`/`SetNumUninitialized` | **아무 값** |
+| `TArray::AddDefaulted` | 구조체의 기본 생성자대로. 초기값이 없는 멤버는 **아무 값** (`AddZeroed` 는 0) |
+
+- "아무 값"은 그 메모리를 직전에 누가 썼느냐에 달려 있어서, Debug 와 Development 빌드, 에디터와 패키징, 실행 순서에 따라 달라집니다. 그래서 "가끔", "내 PC 에서만" 나타납니다.
+- 언리얼은 시작할 때 USTRUCT 의 `UPROPERTY` 기본값을 검사해서, 초기값이 빠진 것을 Output Log 에 빨간 줄로 남깁니다:
+  `LogClass: Error: IntProperty FBH_RoundStats::Kills is not initialized properly. Module:BugHuntUE File:Labs/Lab38_RoundStats.h`
+  이 저장소에서는 랩 38 이 고쳐질 때까지 에디터를 켤 때마다 이 줄이 보입니다. `UPROPERTY` 가 없는 멤버와 지역 변수는 검사하지 않습니다.
+- 데이터 중단점(2부)으로 "이 값을 처음 쓴 게 누구인가"를 찾으면, 아무도 쓰지 않았다는 것을 확인할 수 있습니다.
+
+## 10부 랩 목록
+
+| # | 이름 | 증상 | 새로 배우는 것 | 난이도 |
+|---|---|---|---|---|
+| 36 | 돌진 | 30fps 에서는 반만, 120fps 에서는 두 배로 돌진한다 | 이동에 **`DeltaSeconds`** 빠짐, `t.MaxFPS`, 고정 시간 간격 | ★ |
+| 37 | 얼음 미끄럼 | 30fps 에서는 멀리, 120fps 에서는 짧게 미끄러진다 (이동에는 `DeltaSeconds` 를 곱했는데도) | **프레임당 감속**(`Velocity *= 0.9`), `FMath::Pow`/`Exp` 로 시간 기준 감속, `FInterpTo` | ★★ |
+| 38 | 라운드 점수판 | 새 라운드인데 지난 라운드 킬 수가 남아 있다 | 구조체 멤버 **초기값 없음**, UObject 는 0, `AddDefaulted` vs `AddZeroed`, `Reset` 이 남긴 메모리 | ★★ |
+
+- 셋 다 GPU 없이 판정됩니다(`-nullrhi` 검증 완료). 랩 36, 37 은 한 번 실행에 30fps 와 120fps 를 차례로 돌립니다.
+
+---
+
+# 11부: 물리
+
+물리 버그는 "가끔 뚫고 지나간다", "가끔 안 눌린다"로 신고됩니다. 같은 장면을 프레임 단위로 되감아 보는 도구가 핵심입니다. 이 부의 랩은 모두 **고정 60fps**로 돌아서 결과가 늘 같습니다.
+
+## 11부에서 쓰는 도구
+
+| 도구 | 하는 법 | 언제 |
+|---|---|---|
+| `show Collision` | 콘솔 (PIE 중) | 충돌 모양이 실제로 어디 있는지 |
+| `p.Chaos.DebugDraw.Enabled 1` | 콘솔. `p.Chaos.DebugDraw.ShowCollisionParticles 1` 등 하위 옵션 | 물리 엔진이 보는 물체와 접촉점을 화면에 그림 (예전 PhysX 의 `pxvis collision` 에 해당) |
+| **Chaos Visual Debugger** | Tools → Debug → Chaos Visual Debugger → 녹화 → PIE → 정지 → 프레임 넘기기 | 물리 프레임마다 위치, 속도, 충돌을 되감아 보기 (랩 39, 42) |
+| **Visual Logger** | 2부와 같음. `UE_VLOG_LOCATION`, `UE_VLOG_SEGMENT` 로 위치와 이동 경로를 남김 | "이 프레임에 어디서 어디로 갔나" |
+| 디테일 패널 **Collision** | PIE 일시 정지 → World Outliner 에서 선택 | 채널 응답(Ignore/Overlap/Block), Generate Overlap Events, Simulation Generates Hit Events (랩 40) |
+| `Collision` 프로필 | Project Settings → Collision → Preset | `BlockAll`, `OverlapAll`, `Trigger`, `PhysicsActor` 가 채널별로 어떻게 응답하는지 |
+| 서브스테핑 | Project Settings → Physics → Substepping, Max Substep Delta Time | 낮은 프레임레이트에서도 물리 한 단계를 작게. 프레임레이트에 따라 물리 결과가 달라질 때 |
+
+Block 과 Overlap 규칙: 두 물체의 서로에 대한 응답 중 **약한 쪽**이 이깁니다(Ignore < Overlap < Block). 둘 다 Block 이면 Hit, 하나라도 Overlap 이면 Overlap(그리고 **둘 다** Generate Overlap Events 가 켜져 있어야 이벤트), 하나라도 Ignore 면 아무 일도 없습니다.
+
+## 11부 랩 목록
+
+| # | 이름 | 증상 | 새로 배우는 것 | 난이도 |
+|---|---|---|---|---|
+| 39 | 저격탄 | 탄환이 얇은 철판을 뚫고 지나간다 | **터널링**, 연속 충돌 검출 **`bUseCCD`**, 히트스캔/스윕과 비교 | ★ |
+| 40 | 압력판 | 상자를 올려 놓아도 압력판이 눌리지 않는다 | 채널 응답, **Generate Overlap Events 는 양쪽 다**, `AStaticMeshActor` 가 끄는 기본값 | ★★ |
+| 41 | 넉백 | 밀려난 거한이 성벽 너머에 서 있다 | **`SetActorLocation` 의 `bSweep=false`(순간이동)**, 스윕과 `FHitResult` | ★ |
+| 42 | 투석기 | 투석기가 던진 바위가 그 자리에 뚝 떨어진다 | 물리 시뮬레이션 중인 물체를 **Tick 에서 위치로 옮기기**, 물리 속도, `SetPhysicsLinearVelocity`/힘/PhysicsHandle | ★★ |
+
+- 넷 다 GPU 없이 판정됩니다(`-nullrhi` 에서 Chaos 물리가 그대로 돈다는 것을 확인했습니다).
+
+---
+
+# 12부: 데이터 레이스
+
+작업 스레드(`AsyncTask`, `ParallelFor`, `UE::Tasks`)가 같은 데이터를 잠금 없이 만지는 버그입니다. 진짜 레이스는 "백 번에 한 번"이라 실습으로 재현하기 어려우므로, 이 부의 랩에는 레이스가 일어날 틈을 넓히는 **확대경** `BugHunt::RaceWindow()` 가 있습니다(`Core/BugHuntProbe.h`, 버그 없음). 이 줄에 도착한 스레드는 다른 스레드가 같은 줄에 올 때까지 잠깐 기다리므로, 보호되지 않은 코드에서는 **매번** 겹칩니다. 지워도 버그는 남고 "가끔"이 될 뿐입니다.
+
+## 12부에서 쓰는 도구
+
+| 도구 | 하는 법 | 언제 |
+|---|---|---|
+| **스레드 창** | 디버그 → 창 → 스레드 (Ctrl+Alt+H). 스레드 이름(GameThread, Foreground Worker, Background Worker...) | 지금 멈춘 코드가 어느 스레드에서 도는가 |
+| **병렬 스택** | Ctrl+Shift+D, S | 같은 함수에 동시에 서 있는 스레드가 몇 개인가 |
+| 추적점 `{FPlatformTLS::GetCurrentThreadId()}` | 중단점 → 작업 | 스레드 번호와 값을 같이 찍어 순서 보기 |
+| **Unreal Insights** | 명령줄 `-trace=default,task` → Timing 창의 스레드 트랙 | 어떤 작업이 어느 스레드에서 언제 겹쳐 돌았나 |
+| `check(IsInGameThread())` | 게임 스레드 전용 코드 맨 위 | 다른 스레드에서 들어오면 그 자리에서 멈춤 (엔진 곳곳에 있음) |
+| `FCriticalSection` + `FScopeLock` | `FScopeLock Lock(&CS);` 블록 끝에서 자동 해제 | 읽기-계산-쓰기를 한 덩어리로 |
+| `std::atomic` / `TAtomic` | `Count.fetch_add(1)` | 숫자 하나를 여러 스레드가 더할 때 |
+| `AsyncTask(ENamedThreads::GameThread, ...)` | 작업 스레드에서 게임 스레드로 결과 보내기 | UObject 를 고쳐야 할 때 (랩 28, 44) |
+
+## 12부 랩 목록
+
+| # | 이름 | 증상 | 새로 배우는 것 | 난이도 |
+|---|---|---|---|---|
+| 43 | 길드 금고 | 동시에 입금하면 골드가 모자란다 | `ParallelFor` 와 **읽기-계산-쓰기 레이스(lost update)**, `FCriticalSection`/`FScopeLock`, 원자 연산, 결과를 칸별로 모으기 | ★★ |
+| 44 | 하이라이트 점수 | 리플레이 분석이 끝나면 `IsInGameThread` assert 로 죽는다 | **게임 스레드 전용 객체를 작업 스레드에서 만짐**, 스레드 창, `AsyncTask(GameThread)` | ★ |
+
+- 둘 다 GPU 없이 판정됩니다. 랩 44 는 버그 상태에서 CRASH 입니다.
+- 8부의 랩 28(데드락)도 같은 스레드 도구를 씁니다.
+
+---
+
+# 13부: 성능
+
+성능 버그는 결과가 맞습니다. "느려요", "멈칫해요"만 있습니다. 그래서 이 부의 랩은 **시간 대신 횟수**(검색 횟수, 메모리 할당 횟수, Tick 호출 횟수, 동기 로드 횟수)로 판정합니다. 시간은 PC 마다 다르지만 횟수는 같기 때문입니다. 실제 게임에서는 아래 도구로 시간을 먼저 보고, 그 안에서 횟수를 셉니다.
+
+## 13부에서 쓰는 도구
+
+| 도구 | 하는 법 | 언제 |
+|---|---|---|
+| `stat unit` | 콘솔 | Frame / Game / Draw / GPU 중 어느 스레드가 느린가 |
+| `stat game` | 콘솔 | 게임 스레드 안에서 Tick, 타이머 등이 쓰는 시간 |
+| `stat startfile` / `stat stopfile` | 콘솔. `Saved/Profiling/` 에 파일 | 몇 초 동안의 통계를 기록해 나중에 보기 |
+| **Unreal Insights** | 명령줄 `-trace=cpu` (할당까지: `-trace=cpu,memalloc`, 로드까지: `-trace=cpu,loadtime`) → Tools → Unreal Insights | 긴 프레임을 골라 그 안의 함수별 시간을 보기. 가장 먼저 쓰는 도구 |
+| `dumpticks` | 콘솔 | 등록된 틱 함수 수와 목록 (랩 47) |
+| `obj list class=...` | 콘솔 | 무엇이 메모리에 올라와 있나 (랩 48) |
+| `log LogStreaming Verbose` | 콘솔 | 에셋 로드가 언제 일어나는지 로그로 |
+
+## 13부 랩 목록
+
+| # | 이름 | 증상 | 새로 배우는 것 | 난이도 |
+|---|---|---|---|---|
+| 45 | 미니맵 | 아이콘이 많으면 게임이 느려진다 | Tick 마다 **`GetAllActorsOfClass`**, BeginPlay 에서 찾아 기억하기 | ★ |
+| 46 | 조준선 | 조준하는 동안 메모리 할당이 잦다 | 프레임마다 지역 `TArray` 재할당, **`Reserve`**, 멤버 + `Reset`, `TInlineAllocator` | ★ |
+| 47 | 횃불 | 횃불 수백 개를 세우면 느려진다 | 할 일 없는 **Tick 끄기**, 타이머, `TickInterval`, Significance Manager | ★ |
+| 48 | 보스 등장 | 보스가 나오는 순간 화면이 멈칫한다 | 게임 중 **동기 로드**(`LoadSynchronous`/`LoadObject`), `RequestAsyncLoad` 로 미리 불러 두기 | ★★ |
+
+- 넷 다 GPU 없이 판정됩니다. 판정은 횟수로만 합니다(로그의 ms 는 참고용).
 
 ---
 
@@ -498,7 +631,7 @@ LogBugHunt: [FAIL] 응답 없음 (2003 ms / 213회 초과) - 엘리베이터 기
 grade.bat
 ```
 
-먼저 `build.bat`으로 빌드한 뒤, 랩마다 **새 게임 프로세스**를 띄워 `-BugHuntLab=N -BugHuntExit`로 실행하고 그 로그를 읽습니다. 랩 하나에 프로세스 시작을 포함해 25~35초(멀티플레이 랩은 45초 안팎), 35개 전체는 20분 안팎 걸립니다.
+먼저 `build.bat`으로 빌드한 뒤, 랩마다 **새 게임 프로세스**를 띄워 `-BugHuntLab=N -BugHuntExit`로 실행하고 그 로그를 읽습니다. 랩 하나에 프로세스 시작을 포함해 25~35초(멀티플레이 랩은 45초 안팎), 48개 전체는 25분 안팎 걸립니다.
 
 ```
   #  부   결과       시간  랩  - 내용
@@ -517,16 +650,16 @@ grade.bat
 | FAIL | `[FAIL]` 이 하나라도 있음 (내용 칸은 첫 번째 FAIL) |
 | TIMEOUT | 8부 안전장치가 "응답 없음"을 보고했거나, 랩 프로세스가 제한 시간(기본 180초) 안에 끝나지 않아 채점기가 종료함 |
 | CRASH | 프로세스가 크래시(`Unhandled Exception`, `Assertion failed`, `Fatal error`)했거나 결과 줄 없이 끝남 |
-| SKIP | 이 환경에서 판정할 수 없음 (예: 오디오 장치가 없는데 랩 14). GPU 렌더링 결과가 필요한 랩도 SKIP 하지만 지금 35개 중에는 없습니다 |
+| SKIP | 이 환경에서 판정할 수 없음 (예: 오디오 장치가 없는데 랩 14). GPU 렌더링 결과가 필요한 랩도 SKIP 하지만 지금 48개 중에는 없습니다 |
 
 점수는 `PASS 수 / (전체 - SKIP)` 입니다.
 
-- **숨은 입력:** 채점기는 실행할 때마다 무작위 시드를 정해 `-BugHuntSeed=시드`로 넘깁니다. 이를 지원하는 랩(5, 11, 22~35)은 README 에 적힌 공개 입력과 **다른 값**(피해량, 개수, 그래프 모양, 시간)으로 돕니다. 기대값을 코드에 박아 넣은 "수정"은 여기서 걸립니다. 같은 입력을 PIE 에서 재현하려면 표 위에 찍힌 시드로 `BugHunt.Lab 22 시드`.
+- **숨은 입력:** 채점기는 실행할 때마다 무작위 시드를 정해 `-BugHuntSeed=시드`로 넘깁니다. 이를 지원하는 랩(5, 11, 22~48 대부분)은 README 에 적힌 공개 입력과 **다른 값**(피해량, 개수, 그래프 모양, 시간)으로 돕니다. 기대값을 코드에 박아 넣은 "수정"은 여기서 걸립니다. 같은 입력을 PIE 에서 재현하려면 표 위에 찍힌 시드로 `BugHunt.Lab 22 시드`.
 - **멀티플레이 랩(11, 12, 15, 35)** 은 3부에서 설명한 자동 검증 방식 그대로 리슨 서버 프로세스(`?listen -BugHuntWaitForClient`)와 클라이언트 프로세스(`127.0.0.1:포트`)를 띄웁니다. 클라이언트 쪽 `[FAIL]` 도 그 랩의 FAIL 로 셉니다.
 - **결과 파일:** `grade-report.json` (프로젝트 폴더, 다른 BugHunt 판과 같은 형식). 랩별 로그는 `Saved/Grade/LabNN.log`, 클라이언트는 `LabNN_client.log`.
 
 ```json
-{ "edition": "unreal", "version": "1.0", "total": 35, "passed": 0,
+{ "edition": "unreal", "version": "1.0", "total": 48, "passed": 0,
   "labs": [ { "id": 1, "title": "회복 아이템", "part": 1, "result": "CRASH", "ms": 35800, "detail": "Unhandled Exception: EXCEPTION_ACCESS_VIOLATION ..." } ] }
 ```
 

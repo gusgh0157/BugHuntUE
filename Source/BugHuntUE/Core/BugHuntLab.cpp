@@ -1,5 +1,6 @@
 #include "Core/BugHuntLab.h"
 #include "Core/BugHuntCase.h"
+#include "Core/BugHuntProbe.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 #include "EngineUtils.h"
@@ -19,6 +20,7 @@ void ABugHuntLab::BeginLab(int32 InLabNumber, const FString& InTitle)
 	LabTitle = InTitle;
 	BugHunt::ResetTally();
 	BugHunt::ResetCase();
+	BugHunt::ResetProbes();
 	BugHunt::Print(FString::Printf(TEXT("==== 랩 %d: %s ===="), LabNumber, *LabTitle), FColor::Cyan);
 	if (BugHunt::IsHiddenCase())
 	{
@@ -34,6 +36,7 @@ void ABugHuntLab::FinishLab()
 		return;
 	}
 	bFinished = true;
+	BugHunt::SetFixedFrameRate(0.f);
 
 	const int32 Failed = BugHunt::NumFailed();
 	const FColor Color = Failed == 0 ? FColor::Green : FColor::Red;

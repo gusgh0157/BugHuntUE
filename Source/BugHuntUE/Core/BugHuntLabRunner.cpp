@@ -54,6 +54,19 @@
 #include "Labs/Lab33_FogOfWar.h"
 #include "Labs/Lab34_LootBag.h"
 #include "Labs/Lab35_QuestBoard.h"
+#include "Labs/Lab36_Dash.h"
+#include "Labs/Lab37_IceSlide.h"
+#include "Labs/Lab38_RoundStats.h"
+#include "Labs/Lab39_Sniper.h"
+#include "Labs/Lab40_PressurePlate.h"
+#include "Labs/Lab41_Knockback.h"
+#include "Labs/Lab42_Catapult.h"
+#include "Labs/Lab43_GuildVault.h"
+#include "Labs/Lab44_ScoreFeed.h"
+#include "Labs/Lab45_Minimap.h"
+#include "Labs/Lab46_AimPreview.h"
+#include "Labs/Lab47_Torches.h"
+#include "Labs/Lab48_BossEntrance.h"
 
 namespace
 {
@@ -109,11 +122,28 @@ const FLabEntry GLabs[] = {
 	{ TEXT("전장의 안개"),   TEXT("같은 칸이 여러 번 밝혀진다"),                   [] { return ABH_Lab33::StaticClass(); } },
 	{ TEXT("전리품 가방"),   TEXT("시간이 지나면 가방 속 아이템이 사라진다"),     [] { return ABH_Lab34::StaticClass(); } },
 	{ TEXT("퀘스트 게시판"), TEXT("클라이언트의 퀘스트 진행도가 0에서 멈춘다"),   [] { return ABH_Lab35::StaticClass(); } },
+	// 10부: 프레임레이트와 초기화
+	{ TEXT("돌진"),          TEXT("프레임레이트에 따라 돌진 거리가 다르다"),       [] { return ABH_Lab36::StaticClass(); } },
+	{ TEXT("얼음 미끄럼"),   TEXT("프레임레이트에 따라 미끄러지는 거리가 다르다"), [] { return ABH_Lab37::StaticClass(); } },
+	{ TEXT("라운드 점수판"), TEXT("새 라운드에 지난 라운드 점수가 남아 있다"),     [] { return ABH_Lab38::StaticClass(); } },
+	// 11부: 물리
+	{ TEXT("저격탄"),        TEXT("탄환이 얇은 철판을 뚫고 지나간다"),             [] { return ABH_Lab39::StaticClass(); } },
+	{ TEXT("압력판"),        TEXT("상자를 올려도 압력판이 눌리지 않는다"),         [] { return ABH_Lab40::StaticClass(); } },
+	{ TEXT("넉백"),          TEXT("밀려난 적이 성벽 너머에 서 있다"),               [] { return ABH_Lab41::StaticClass(); } },
+	{ TEXT("투석기"),        TEXT("투석기가 던진 바위가 그 자리에 떨어진다"),       [] { return ABH_Lab42::StaticClass(); } },
+	// 12부: 데이터 레이스
+	{ TEXT("길드 금고"),     TEXT("동시에 입금하면 골드가 모자란다"),               [] { return ABH_Lab43::StaticClass(); } },
+	{ TEXT("하이라이트 점수"), TEXT("리플레이 분석이 끝나면 크래시한다"),          [] { return ABH_Lab44::StaticClass(); } },
+	// 13부: 성능
+	{ TEXT("미니맵"),        TEXT("아이콘이 많으면 게임이 느려진다"),               [] { return ABH_Lab45::StaticClass(); } },
+	{ TEXT("조준선"),        TEXT("조준하는 동안 메모리 할당이 잦다"),             [] { return ABH_Lab46::StaticClass(); } },
+	{ TEXT("횃불"),          TEXT("횃불이 많으면 게임이 느려진다"),                 [] { return ABH_Lab47::StaticClass(); } },
+	{ TEXT("보스 등장"),     TEXT("보스가 나올 때 화면이 멈칫한다"),                 [] { return ABH_Lab48::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
 // 각 부의 첫 랩 번호 (채점표의 "부" 칸)
-constexpr int32 GPartFirstLab[] = { 1, 5, 11, 13, 16, 19, 22, 26, 29 };
+constexpr int32 GPartFirstLab[] = { 1, 5, 11, 13, 16, 19, 22, 26, 29, 36, 39, 43, 45 };
 
 int32 PartOf(int32 Number)
 {

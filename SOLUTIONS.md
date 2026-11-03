@@ -747,3 +747,218 @@ Entry.Progress += Amount;
 Quests.MarkItemDirty(Entry);       // 원소를 지웠으면 Quests.MarkArrayDirty()
 ```
 **교훈:** 일반 `UPROPERTY(Replicated) TArray` 는 엔진이 매번 비교해서 알아서 보낸다(대신 큰 배열이면 비싸다). `FFastArraySerializer` 는 비교를 생략하는 대가로 **바꾼 사람이 표시할 책임**을 진다. 원소를 바꾸는 함수를 한곳에 모아(이 랩의 AddProgress) 거기서만 `MarkItemDirty` 하면 빠뜨리지 않는다. 클라이언트 쪽 반응은 원소의 `PostReplicatedAdd`/`PostReplicatedChange`/`PreReplicatedRemove` 로 받는다.
+
+# 10부: 프레임레이트와 초기화
+
+## Lab 36 — 이동에 DeltaSeconds 를 곱하지 않음
+```
+틀린 결과:     30fps 돌진 거리 160 cm, 120fps 610 cm (기대 300 cm)
+멈춘 위치:     ABH_Dasher::Tick 에 조건부 중단점 bDashing. DeltaSeconds 는 0.0333 / 0.0083, 매번 X 가 10 씩 늘어남.
+               추적점으로 세면 0.5초 돌진에 Tick 이 16번 / 61번
+진짜 원인:     DashSpeed 가 "한 프레임에 10cm" 였다. 60fps 에서 맞춘 숫자라 60fps 에서만 맞다.
+               돌진 시간(DashTimeLeft)은 DeltaSeconds 로 줄였으니, 이동 횟수만 프레임레이트를 따라갔다.
+```
+**수정:**
+```cpp
+float DashSpeed = 600.f;   // 초당 cm
+AddActorWorldOffset(FVector(DashSpeed * DeltaSeconds, 0.f, 0.f));
+```
+**교훈:** Tick 안에서 "얼마나"를 바꾸는 모든 식(이동, 회전, 쿨다운, 게이지)에는 `DeltaSeconds` 가 곱해져 있어야 한다. 단위를 이름에 적어 둔다(`SpeedCmPerSec`). 테스트는 `t.MaxFPS 30` 과 `t.MaxFPS 120` 두 번 돌려 본다.
+
+## Lab 37 — 프레임마다 0.9 배 감속
+```
+틀린 결과:     30fps 400 cm, 120fps 100 cm (60fps 기준 200 cm)
+멈춘 위치:     Tick 에 추적점 {Velocity}. 1초 뒤 속도가 30fps 에서 약 50, 120fps 에서 거의 0
+진짜 원인:     Velocity *= 0.9 는 "Tick 한 번에 10%" 감속이다. 1초에 30번이면 0.9^30, 120번이면 0.9^120.
+               이동에 DeltaSeconds 를 곱한 것만으로는 부족하다. 감속(곱셈)도 시간에 맞춰야 한다.
+```
+**수정:**
+```cpp
+Velocity *= FMath::Pow(Friction, DeltaSeconds * 60.f);    // "1/60 초마다 0.9 배"
+// 또는 처음부터 시간 기준으로: Velocity *= FMath::Exp(-Damping * DeltaSeconds);
+```
+**교훈:** 더하기는 `* DeltaSeconds`, 곱하기는 `Pow(x, DeltaSeconds * 기준fps)` 또는 `Exp(-k * DeltaSeconds)`. `Lerp(Current, Target, 0.1f)` 를 매 Tick 부르는 카메라/UI 보간도 같은 버그다(`FInterpTo` 를 쓴다). 위치와 속도를 어느 순서로 갱신하느냐(오일러 적분)도 프레임레이트에 따라 결과가 조금 다르다. 수치가 정확해야 하면 고정 시간 간격이나 물리 서브스테핑을 쓴다.
+
+## Lab 38 — 구조체 멤버에 초기값이 없음
+```
+틀린 결과:     2라운드 킬이 1, 1, 1 이어야 하는데 -1527265117, 40405, ... (실행마다 다를 수 있음)
+멈춘 위치:     두 번째 StartRound 의 AddDefaulted_GetRef 다음 줄. Entry.Player 는 새 이름, Kills/Deaths 는 이상한 값.
+               에디터를 켤 때 Output Log: LogClass: Error: IntProperty FBH_RoundStats::Kills is not initialized properly.
+진짜 원인:     FBH_RoundStats 의 Kills, Deaths 에 초기값이 없다. AddDefaulted 는 기본 생성자를 부르는데, 초기값이 없으면 int32 는
+               그 자리에 있던 바이트 그대로다. Stats.Reset() 은 메모리를 남겨 두므로 그 자리에는 1라운드 기록(과 그 전의 쓰레기)이 있었다.
+               ABH_RoundBoard::Round 는 초기값이 없어도 0 에서 시작했다. UObject 는 메모리를 0 으로 채운 뒤 만들어지기 때문이다.
+```
+**수정:**
+```cpp
+UPROPERTY() int32 Kills = 0;
+UPROPERTY() int32 Deaths = 0;
+```
+`Stats.AddZeroed_GetRef()` 도 이 한 곳은 고치지만, 지역 변수 `FBH_RoundStats S;` 나 `FMemory::Malloc` 으로 만든 곳은 여전히 쓰레기다.
+**교훈:** 구조체와 지역 변수는 선언하는 줄에서 초기화한다(UE 코딩 표준). UObject 의 "자동 0" 에 기대지 말고 UObject 멤버에도 초기값을 적는다. "is not initialized properly" 줄은 무시하지 않는다. 쓰레기 값 버그는 Debug(0xCD 같은 패턴), Development, 다른 PC 에서 서로 다르게 보이므로 "내 PC 에선 되는데요"의 단골이다.
+
+# 11부: 물리
+
+## Lab 39 — 빠르고 작은 물체의 터널링 (CCD 꺼짐)
+```
+틀린 결과:     탄환이 철판에 맞지 않았다 (Hit 0번), 탄환 X 가 철판 너머
+멈춘 위치:     Chaos Visual Debugger 로 녹화해서 프레임을 넘기면 탄환이 철판 앞 → 철판 뒤로 한 번에 넘어간다
+진짜 원인:     60fps 에서 초속 300m 탄환은 한 물리 단계에 5m 를 간다. 물리는 단계마다 "지금 위치"에서만 겹침을 보므로
+               두께 4cm 철판은 두 위치 사이에 끼어 보이지 않는다.
+```
+**수정:**
+```cpp
+Ball->SetUseCCD(true);    // 디테일 패널 Collision → Use CCD
+```
+**교훈:** 한 단계에 가는 거리(속도 × 단계 시간)가 상대 물체의 두께보다 크면 터널링한다. 빠른 것에만 CCD 를 켠다(비싸다). 총알은 보통 물리 대신 라인 트레이스(히트스캔)나 스윕으로 이동하는 `UProjectileMovementComponent` 를 쓴다. 서브스테핑은 단계를 작게 할 뿐이라 이 속도에서는 모자란다.
+
+## Lab 40 — AStaticMeshActor 는 Generate Overlap Events 가 꺼져 있음
+```
+틀린 결과:     상자는 압력판 안에 놓였는데 눌린 횟수 0, 문 안 열림
+멈춘 위치:     PIE 일시 정지 → 상자 디테일 패널 Collision: Generate Overlap Events 체크 해제 상태.
+               ABH_WoodCrate 생성자에서 F12 → AStaticMeshActor 생성자: StaticMeshComponent->SetGenerateOverlapEvents(false)
+진짜 원인:     Overlap 이벤트는 두 컴포넌트가 서로를 Overlap 으로 응답하고 "둘 다" Generate Overlap Events 가 켜져 있어야 생긴다.
+               압력판만 켜고 상자는 부모 클래스 기본값(꺼짐)을 그대로 썼다.
+```
+**수정:**
+```cpp
+Mesh->SetGenerateOverlapEvents(true);   // ABH_WoodCrate 생성자
+```
+**교훈:** 트리거가 안 불리면 ① 채널 응답(양쪽), ② Generate Overlap Events(양쪽), ③ 정말 겹쳤나(`show Collision`) 순서로 본다. 둘 다 Block 이면 Overlap 이 아니라 Hit 이 온다(그리고 Hit 은 Simulation Generates Hit Events 가 켜져야 물리 충돌에서 온다). 부모 클래스 생성자가 바꾸는 기본값을 의심한다(`AStaticMeshActor`, `ACharacter` 의 캡슐 등).
+
+## Lab 41 — SetActorLocation 의 기본은 순간이동 (bSweep=false)
+```
+틀린 결과:     거한 뒷면 X=540, 성벽 앞면 X=280
+멈춘 위치:     Knockback 의 SetActorLocation 에서 F12 → bSweep = false 가 기본값
+진짜 원인:     Block 충돌은 스윕하는 이동만 막는다. 순간이동은 목적지에 놓기만 하고 가는 길은 보지 않는다.
+```
+**수정:**
+```cpp
+FHitResult Hit;
+SetActorLocation(Target, /*bSweep*/ true, &Hit);   // 성벽 앞에서 멈춤. Hit.bBlockingHit 로 "벽꿍" 처리
+```
+**교훈:** 게임플레이 이동(넉백, 대시, 밀기)은 스윕으로 한다. 순간이동이 맞는 경우(리스폰, 텔레포트)에만 `bSweep=false`. 스윕은 루트 컴포넌트 모양으로만 한다. 캐릭터는 `LaunchCharacter`/`CharacterMovement` 가 대신 해 준다.
+
+## Lab 42 — 물리 시뮬레이션 중인 물체를 위치로 옮김
+```
+틀린 결과:     놓은 직후 바위 속도 (0, 0, -635) (팔 속도 X 1000, Z 1000) → 그 자리에서 떨어짐
+멈춘 위치:     Tick 에 추적점 {Carried->Ball->GetPhysicsLinearVelocity()}: 들고 있는 동안 X 는 0, Z 는 중력 때문에 계속 커지는 음수
+진짜 원인:     SetActorLocation 은 물리 물체를 "그 자리에 옮겨 놓기"만 하고 물리 속도는 건드리지 않는다.
+               매 프레임 옮겨 놓아도 물리 엔진은 바위가 앞으로 움직인다고 모르고, 놓는 순간 물리가 아는 속도로 떨어진다.
+```
+**수정:**
+```cpp
+void ABH_Catapult::Release()
+{
+    Carried->Ball->SetPhysicsLinearVelocity(ArmVelocity);   // 놓는 순간의 속도를 물리에 알려 준다
+    Carried = nullptr;
+}
+```
+들고 있는 동안부터 물리로 움직이려면 Tick 에서 `SetPhysicsLinearVelocity((ArmTip - 현재 위치) / DeltaSeconds)` 나 `UPhysicsHandleComponent`.
+**교훈:** 시뮬레이션 중인 물체는 위치가 아니라 속도, 힘, 충격량으로 움직인다. Tick 에서 위치를 덮어쓰면 던질 때 속도가 사라지고, 다른 물체와 부딪힐 때 덜덜 떨거나 뚫는다. 꼭 위치로 움직여야 하면 그동안 시뮬레이션을 끄거나(키네마틱) 물리 핸들을 쓴다.
+
+# 12부: 데이터 레이스
+
+## Lab 43 — 잠금 없는 읽기-계산-쓰기 (lost update)
+```
+틀린 결과:     금고 골드 기대 1000, 실제 500 (공개 입력: 100+200+300+400. 어느 둘이 겹치느냐에 따라 500~700)
+멈춘 위치:     Gold = Before + Amount 줄에 중단점 → 병렬 스택: 두 스레드가 같은 줄에 서 있고 둘 다 Before = 0
+진짜 원인:     Gold += Amount 는 읽기, 더하기, 쓰기 세 단계다. 두 스레드가 같은 값을 읽고 각자 써서 한쪽 입금이 사라졌다.
+               (RaceWindow 는 이 틈을 넓혀 매번 겹치게 할 뿐이다.)
+```
+**수정:**
+```cpp
+struct FBH_GuildVault
+{
+    int32 Gold = 0;
+    FCriticalSection Lock;
+    void Deposit(int32 Amount)
+    {
+        FScopeLock ScopeLock(&Lock);
+        const int32 Before = Gold;
+        BugHunt::RaceWindow();
+        Gold = Before + Amount;
+    }
+};
+```
+숫자 하나라면 `std::atomic<int32> Gold; Gold.fetch_add(Amount);` 도 된다.
+**교훈:** 여러 스레드가 같은 데이터를 고치면 읽기부터 쓰기까지를 한 덩어리로 보호한다. 가장 좋은 것은 공유하지 않는 것: 작업마다 자기 칸(`Results[Index]`)에 쓰고 끝난 뒤 한 스레드에서 합친다. 레이스는 "가끔" 일어나므로 테스트가 통과했다는 것은 증거가 아니다. 의심되면 일부러 틈을 넓혀(`Sleep`, 이 랩의 RaceWindow) 재현한다.
+
+## Lab 44 — 작업 스레드에서 게임 스레드 전용 객체를 만짐
+```
+틀린 결과:     Assertion failed: IsInGameThread()  (CRASH)
+멈춘 위치:     호출 스택 맨 위 ABH_ScoreFeed::AddScore, 맨 아래는 Async 가 띄운 스레드의 실행 함수. 스레드 창의 현재 스레드는 GameThread 가 아니다
+진짜 원인:     Async(EAsyncExecution::Thread, ...) 람다 안에서 액터의 AddScore 를 불렀다. 액터의 TMap 은 게임 스레드가 잠금 없이 쓰는 데이터다.
+```
+**수정:**
+```cpp
+Async(EAsyncExecution::Thread, [WeakFeed, Points]
+{
+    const FString Mvp = TEXT("Aria");                     // 무거운 계산만 여기서
+    AsyncTask(ENamedThreads::GameThread, [WeakFeed, Mvp, Points]
+    {
+        if (ABH_ScoreFeed* Target = WeakFeed.Get()) { Target->AddScore(Mvp, Points); }
+    });
+});
+```
+**교훈:** UObject/액터/컴포넌트/월드는 게임 스레드에서만. 작업 스레드에는 계산에 필요한 값만 복사해 넘기고, 결과는 `AsyncTask(GameThread)`(또는 `UE::Tasks` 의 후속 작업, `FTSTicker`)로 돌려보낸다. `TWeakObjectPtr::Get()` 도 게임 스레드에서 부른다. 내가 만든 게임 스레드 전용 함수에도 `check(IsInGameThread())` 를 넣어 두면 이런 실수가 그 자리에서 잡힌다.
+
+# 13부: 성능
+
+## Lab 45 — Tick 마다 월드 전체 검색
+```
+틀린 결과:     1초 동안 액터 전체 검색 12,000번 (아이콘 200개 × 60프레임)
+멈춘 위치:     stat game 에서 Tick 시간이 큼. Insights 의 긴 프레임 안에 ABH_MapMarker::Tick → GetAllActorsOfClass 가 200번
+진짜 원인:     바뀌지 않는 대상(플레이어)을 매 프레임, 아이콘마다 새로 찾았다. 액터 N 개 × 아이콘 M 개 × 프레임.
+```
+**수정:**
+```cpp
+TWeakObjectPtr<ABH_MapHero> Hero;                         // 헤더
+void ABH_MapMarker::BeginPlay() { Super::BeginPlay(); Hero = FindHero(GetWorld()); }
+void ABH_MapMarker::Tick(float DeltaSeconds) { ...; if (const ABH_MapHero* Found = Hero.Get()) { ... } }
+```
+**교훈:** Tick 안의 `GetAllActorsOfClass`, `FindComponentByClass`, `TActorIterator` 는 거의 항상 BeginPlay 로 옮길 수 있다. 대상이 바뀔 수 있으면 약한 포인터로 기억하고, 바뀌는 순간(스폰, 파괴) 알림을 받는다.
+
+## Lab 46 — 매 프레임 지역 TArray 를 키우며 채움
+```
+틀린 결과:     60프레임 동안 배열 메모리 할당 240번 (프레임당 4번, 점 64개일 때)
+멈춘 위치:     Points.Add 에 조건부 중단점 Points.Num() == Points.Max(): 한 프레임에 여러 번, Max 가 단계적으로 늘어남
+진짜 원인:     개수(NumPoints)를 아는데 알려 주지 않아서, TArray 가 모자랄 때마다 더 큰 메모리를 잡고 옮겼다.
+               지역 배열이라 Tick 이 끝나면 돌려주고 다음 Tick 에 처음부터 다시.
+```
+**수정:**
+```cpp
+Points.Reserve(NumPoints);       // 프레임당 1번
+// 더 줄이려면: 멤버 배열 + Points.Reset() → 처음 한 번 뒤로 0번
+```
+**교훈:** 개수를 알면 `Reserve`. 매 프레임 쓰는 배열은 멤버로 두고 `Reset`(메모리 유지), 작고 개수가 정해져 있으면 `TInlineAllocator`. 문자열도 같다: 매 프레임 `FString::Printf` 로 UI 문자열을 만들면 프레임마다 할당이다. 값이 바뀔 때만 만든다.
+
+## Lab 47 — 할 일 없는 Tick 수백 개
+```
+틀린 결과:     2초 동안 횃불 Tick 36,900번 (300개 × 약 123프레임), 실제로 일렁인 것은 1,200번
+멈춘 위치:     dumpticks 에 BH_Torch 의 틱 함수가 300개. stat game 의 Tick Time 이 횃불 수에 비례
+진짜 원인:     0.5초마다 할 일을 매 프레임 Tick 에서 시간을 더하며 기다렸다.
+```
+**수정:**
+```cpp
+PrimaryActorTick.TickInterval = 0.5f;          // 방법 1: 그 주기로만 Tick
+// 방법 2: bCanEverTick = false + BeginPlay 에서 SetTimer(FlickerHandle, this, &ABH_Torch::Flicker, 0.5f, true)
+```
+**교훈:** 액터 Tick 은 기본으로 꺼 두고 필요할 때만 켠다(`SetActorTickEnabled`). 주기적인 일은 타이머나 `TickInterval`. 수천 개면 매니저 하나가 배열을 돌리고, 멀리 있는 것은 Significance Manager 로 덜 자주.
+
+## Lab 48 — 게임 중 동기 로드
+```
+틀린 결과:     문을 연 순간 동기 로드 1번 (/Engine/BasicShapes/Cone), 그 프레임이 수 ms ~ 수백 ms 멈춤
+멈춘 위치:     -trace=cpu,loadtime → Insights Timing: 그 프레임에 LoadPackage. Asset Loading Insights 에 Cone
+진짜 원인:     소프트 레퍼런스를 SpawnBoss 안에서 LoadSynchronous 했다. 메모리에 없으면 디스크에서 다 읽을 때까지 게임 스레드가 선다.
+```
+**수정:**
+```cpp
+TSharedPtr<FStreamableHandle> LoadHandle;                  // 헤더
+void ABH_BossArena::BeginPlay()
+{
+    Super::BeginPlay();
+    LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(BossMesh.ToSoftObjectPath());
+}
+UStaticMesh* Mesh = BossMesh.Get();                         // SpawnBoss: 이미 와 있음
+```
+**교훈:** 소프트 레퍼런스는 "언제 불러올지 내가 정한다"는 뜻이다. 쓰기 직전이 아니라 미리(방에 들어올 때, 로딩 화면) 비동기로 부르고, 핸들을 들고 있어 GC 가 치우지 않게 한다. `LoadObject`/`LoadSynchronous`/`StaticLoadObject` 를 게임 플레이 코드에서 보면 의심한다. 랩 13 의 발사음은 반대로 "비동기로 너무 늦게" 부른 경우다.
