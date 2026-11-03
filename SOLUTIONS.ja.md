@@ -2,7 +2,7 @@
 
 [한국어](SOLUTIONS.md) | **日本語**
 
-> 注: この文書の出力例は日本語の出力です。ラボを日本語で実行するには `-BugHuntLang=ja`、コンソール変数 `BugHunt.Lang ja`、またはエディター/OS の言語を日本語にします (README.ja.md 参照)。
+> 注: この文書の出力例は日本語の出力です。ラボを日本語で実行するには `-BugHuntLang=ja`、コンソール変数 `BugHunt.Lang ja`、またはエディター/OS の言語を日本語にします ([README.md](README.md) の「日本語」を参照)。
 
 # 第1部: クラッシュの追跡
 
