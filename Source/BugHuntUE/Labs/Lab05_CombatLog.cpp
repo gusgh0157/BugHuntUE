@@ -1,4 +1,5 @@
 #include "Labs/Lab05_CombatLog.h"
+#include "Core/BugHuntCase.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 
@@ -28,25 +29,29 @@ void UBH_CombatLogPanel::HandleDamaged(AActor* Victim, int32 Damage)
 
 void ABH_Lab05::StartLab()
 {
+	const int32 First = BugHunt::CaseInt(10, 3, 20);
+	const int32 WhileClosed = BugHunt::CaseInt(5, 3, 20);
+	const int32 Second = BugHunt::CaseInt(7, 3, 20);
+
 	ABH_Fighter* Knight = SpawnLabActor<ABH_Fighter>();
 	Panel = NewObject<UBH_CombatLogPanel>(this);
 
 	Panel->Open(Knight);
-	Knight->TakeHit(10);
+	Knight->TakeHit(First);
 	Panel->Close();
 
-	Knight->TakeHit(5);     // 창이 닫혀 있을 때 맞은 피해는 기록하지 않는다.
+	Knight->TakeHit(WhileClosed);    // 창이 닫혀 있을 때 맞은 피해는 기록하지 않는다.
 
 	Panel->Open(Knight);
-	Knight->TakeHit(7);
+	Knight->TakeHit(Second);
 
 	for (const FString& Line : Panel->Lines)
 	{
 		BugHunt::Note(FString::Printf(TEXT("전투 기록: %s"), *Line));
 	}
 	BugHunt::Expect(TEXT("다시 연 창의 기록 줄 수"), 1, Panel->Lines.Num());
-	BugHunt::Expect(TEXT("띄운 알림 총합 (10, 7)"), 2, Panel->NotificationsShown);
-	BugHunt::Expect(TEXT("기사 HP"), 78, Knight->Health);
+	BugHunt::Expect(FString::Printf(TEXT("띄운 알림 총합 (%d, %d)"), First, Second), 2, Panel->NotificationsShown);
+	BugHunt::Expect(TEXT("기사 HP"), 100 - First - WhileClosed - Second, Knight->Health);
 	FinishLab();
 }
 

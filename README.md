@@ -11,6 +11,7 @@
 - **6부: 애니메이션 (랩 19~21)**: 발소리가 안 나고, 연타하면 상태가 꼬이고, 끊긴 공격의 히트박스가 남는 버그. 노티파이 횟수와 상태값으로 판정합니다.
 - **7부: 잘못된 포인터 (랩 22~25)**: 죽지 않는 포인터 버그. 지워진 액터를 기억하는 raw 포인터, 객체보다 오래 사는 타이머 람다, `Add` 뒤의 배열 원소 참조, `TSharedPtr` 순환 참조를 주소와 참조 수로 추적합니다.
 - **8부: 멈춤 (랩 26~28)**: 크래시 없이 게임이 굳는 무한루프와 데드락. "모두 중단", 스레드 창, 병렬 스택으로 굳은 순간을 세워 봅니다. (실습용 안전장치가 있어 에디터가 진짜로 굳지는 않습니다.)
+- **채점기**: `grade.bat` 하나로 모든 랩을 헤드리스로 돌려 PASS/FAIL/TIMEOUT/CRASH/SKIP 과 점수를 냅니다. 숨은 입력으로 하드코딩을 막습니다.
 - **부록: Live Coding 함정**: "고쳤는데 그대로예요"의 단골 원인.
 
 > 콘솔판과 같은 규칙입니다. 코드를 눈으로 훑어 정답을 찾지 마세요. 1부는 **죽게 만들고 디버거가 멈춘 곳에서부터**, 2·3부는 **직접 멈춘 곳에서부터 값을 확인하며** 추적하세요.
@@ -24,7 +25,7 @@
 |---|---|---|
 | C++ 콘솔 | 호출 스택, 메모리 오류, 크래시 없는 흐름 추적 (랩 28개) | [BugHunt](https://github.com/gusgh0157/BugHunt) |
 | C# 콘솔 | 예외와 스택 트레이스, 흐름 추적, 비동기/동시성, 리소스와 메모리 (랩 28개) | [BugHuntCS](https://github.com/gusgh0157/BugHuntCS) |
-| 언리얼 엔진 | 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션, 잘못된 포인터, 멈춤(무한루프·데드락) (랩 28개) | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
+| 언리얼 엔진 | 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션, 잘못된 포인터, 멈춤(무한루프·데드락), 채점기 (랩 28개) | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
 | 유니티 | 크래시/예외, 흐름 추적, 사운드, 이미지, 애니메이션 (랩 23개) | [BugHuntUnity](https://github.com/gusgh0157/BugHuntUnity) |
 
 ## 준비
@@ -430,6 +431,62 @@ LogBugHunt: [FAIL] 응답 없음 (2003 ms / 213회 초과) - 엘리베이터 기
 
 ---
 
+# 채점기
+
+모든 랩을 헤드리스(GPU 없이 `-nullrhi`)로 돌려 랩별 결과와 총점을 냅니다. 에디터를 닫고 프로젝트 폴더에서:
+
+```bat
+grade.bat
+```
+
+먼저 `build.bat`으로 빌드한 뒤, 랩마다 **새 게임 프로세스**를 띄워 `-BugHuntLab=N -BugHuntExit`로 실행하고 그 로그를 읽습니다. 랩 하나에 프로세스 시작을 포함해 25~35초(멀티플레이 랩은 45초 안팎), 28개 전체는 15분 안팎 걸립니다.
+
+```
+  #  부   결과       시간  랩  - 내용
+  1  1부  CRASH     35.8s  회복 아이템  - Unhandled Exception: EXCEPTION_ACCESS_VIOLATION reading address 0x0000000000000470
+  5  2부  FAIL      27.6s  전투 기록 창  - 다시 연 창의 기록 줄 수 (기대: 1, 실제: 2) 외 1개
+ 11  3부  FAIL      47.1s  호스트 HP 바  - [리슨 서버] 화면의 HP 바 (기대: 79, 실제: 100)
+ 22  7부  FAIL      25.3s  어그로 표  - Bram 의 어그로 (Bram 이 준 피해) (기대: 23, 실제: 68) 외 1개
+ 26  8부  TIMEOUT   36.1s  엘리베이터  - 응답 없음 (2005 ms / 212회 초과) - 엘리베이터 기다리기
+ ...
+점수: 0 / 28  (SKIP 0개 제외)
+```
+
+| 결과 | 뜻 |
+|---|---|
+| PASS | 랩의 검사가 모두 통과 |
+| FAIL | `[FAIL]` 이 하나라도 있음 (내용 칸은 첫 번째 FAIL) |
+| TIMEOUT | 8부 안전장치가 "응답 없음"을 보고했거나, 랩 프로세스가 제한 시간(기본 180초) 안에 끝나지 않아 채점기가 종료함 |
+| CRASH | 프로세스가 크래시(`Unhandled Exception`, `Assertion failed`, `Fatal error`)했거나 결과 줄 없이 끝남 |
+| SKIP | 이 환경에서 판정할 수 없음 (예: 오디오 장치가 없는데 랩 14). GPU 렌더링 결과가 필요한 랩도 SKIP 하지만 지금 28개 중에는 없습니다 |
+
+점수는 `PASS 수 / (전체 - SKIP)` 입니다.
+
+- **숨은 입력:** 채점기는 실행할 때마다 무작위 시드를 정해 `-BugHuntSeed=시드`로 넘깁니다. 이를 지원하는 랩(5, 11, 22~28)은 README 에 적힌 공개 입력과 **다른 값**(피해량, 개수, 그래프 모양, 시간)으로 돕니다. 기대값을 코드에 박아 넣은 "수정"은 여기서 걸립니다. 같은 입력을 PIE 에서 재현하려면 표 위에 찍힌 시드로 `BugHunt.Lab 22 시드`.
+- **멀티플레이 랩(11, 12, 15)** 은 3부에서 설명한 자동 검증 방식 그대로 리슨 서버 프로세스(`?listen -BugHuntWaitForClient`)와 클라이언트 프로세스(`127.0.0.1:포트`)를 띄웁니다. 클라이언트 쪽 `[FAIL]` 도 그 랩의 FAIL 로 셉니다.
+- **결과 파일:** `grade-report.json` (프로젝트 폴더, 다른 BugHunt 판과 같은 형식). 랩별 로그는 `Saved/Grade/LabNN.log`, 클라이언트는 `LabNN_client.log`.
+
+```json
+{ "edition": "unreal", "version": "1.0", "total": 28, "passed": 0,
+  "labs": [ { "id": 1, "title": "회복 아이템", "part": 1, "result": "CRASH", "ms": 35800, "detail": "Unhandled Exception: EXCEPTION_ACCESS_VIOLATION ..." } ] }
+```
+
+| 옵션 | 하는 일 |
+|---|---|
+| `grade.bat -labs=22-28` | 일부 랩만 (예: `-labs=1-4,22`) |
+| `grade.bat -seed=1234` | 숨은 입력 시드 고정 (같은 결과를 다시 보기) |
+| `grade.bat -public` | 숨은 입력 대신 공개 입력으로 |
+| `grade.bat -nobuild` | 빌드 건너뛰기 |
+| `grade.bat -timeout=300` | 랩 하나의 제한 시간(초) |
+| `grade.bat -gpu` | `-nullrhi` 없이 실행 (GPU 가 필요한 랩도 채점) |
+| `set UE_ROOT=D:\Epic\UE_5.8` | 엔진 위치 바꾸기 (기본 `F:\Program Files\UE_5.8`, `build.bat`도 같음) |
+
+채점기 자체는 커맨드렛입니다(`Core/BugHuntGradeCommandlet.cpp`). `grade.bat` 없이 직접 부르려면 `UnrealEditor-Cmd.exe BugHuntUE.uproject -run=BugHuntGrade -labs=22-28`.
+
+> 채점기는 정답을 알지 못합니다. 랩이 스스로 찍는 `[PASS]`/`[FAIL]`을 모을 뿐입니다. 랩의 검사 코드(`StartLab`의 `Expect` 줄)나 `Core/`를 고쳐서 통과시키는 것은 반칙입니다.
+
+---
+
 # 부록: Live Coding 함정
 
 Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바꿔치기**합니다. 이미 만들어진 객체, 이미 등록된 클래스 정보는 바꾸지 못합니다. 직접 겪어 보세요.
@@ -451,6 +508,7 @@ Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바�
 | 명령 | 하는 일 |
 |---|---|
 | `BugHunt.List` / `BugHunt.Lab N` | 랩 목록 / 랩 실행 |
+| `BugHunt.Lab N 시드` | 랩 N 을 채점기의 숨은 입력(시드)으로 실행. 시드 0 은 공개 입력 |
 | `BugHunt.HangBudgetSeconds 초` | 8부 안전장치의 시간 예산 (기본 2). "모두 중단" 실습 때 30 |
 | `ListTimers` | 살아 있는 타이머 |
 | `dumpticks` | Tick 함수와 그룹 |
@@ -470,6 +528,7 @@ Live Coding(Ctrl+Alt+F11)은 **실행 중인 에디터의 함수 코드를 바�
 | `-game` | 에디터 대신 게임으로 바로 실행 |
 | `-BugHuntLab=N` | 월드가 시작되면 랩 N 자동 실행 |
 | `-BugHuntExit` | 랩이 끝나면 종료 (자동 검증용) |
+| `-BugHuntSeed=S` | 숨은 입력(시드 S)으로 실행 (채점기가 쓴다) |
 | `-stomp2malloc` | 해제된 메모리/범위 밖 접근을 그 자리에서 잡는 할당기 (언리얼판 ASan, 에디터 빌드 전용). 아주 느리고 메모리를 많이 씀. `-MallocStomp2MinSize=`, `-MallocStomp2MaxSize=`로 크기 범위를 좁힐 수 있음 |
 | `-log` | 별도 로그 창 띄우기 |
 

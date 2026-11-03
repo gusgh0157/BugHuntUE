@@ -97,6 +97,31 @@ const FLabEntry GLabs[] = {
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
+// 각 부의 첫 랩 번호 (채점표의 "부" 칸)
+constexpr int32 GPartFirstLab[] = { 1, 5, 11, 13, 16, 19, 22, 26 };
+
+int32 PartOf(int32 Number)
+{
+	int32 Part = 0;
+	for (int32 First : GPartFirstLab)
+	{
+		Part += Number >= First ? 1 : 0;
+	}
+	return Part;
+}
+
+// 서버 + 클라이언트 두 프로세스로 검사하는 랩
+bool IsNetworkedLab(int32 Number)
+{
+	return Number == 11 || Number == 12 || Number == 15;
+}
+
+// 실제 GPU 렌더링 결과를 읽어야 판정되는 랩. 지금은 없다 (README 5부 참고). 생기면 채점기가 SKIP 한다.
+bool NeedsGPU(int32 /*Number*/)
+{
+	return false;
+}
+
 void ListLabs()
 {
 	UE_LOG(LogBugHunt, Display, TEXT("BugHunt UE 랩 목록 (실행: BugHunt.Lab 번호)"));
@@ -159,6 +184,22 @@ FAutoConsoleCommand GListCommand(
 void BugHunt::RunLab(UWorld* World, int32 Number)
 {
 	RunLabImpl(World, Number, INDEX_NONE);
+}
+
+TArray<BugHunt::FLabInfo> BugHunt::GetLabs()
+{
+	TArray<FLabInfo> Labs;
+	for (int32 i = 0; i < GLabCount; ++i)
+	{
+		FLabInfo& Info = Labs.AddDefaulted_GetRef();
+		Info.Number = i + 1;
+		Info.Title = GLabs[i].Title;
+		Info.Symptom = GLabs[i].Symptom;
+		Info.Part = PartOf(Info.Number);
+		Info.bNetworked = IsNetworkedLab(Info.Number);
+		Info.bNeedsGPU = NeedsGPU(Info.Number);
+	}
+	return Labs;
 }
 
 bool UBugHuntAutoRunSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const

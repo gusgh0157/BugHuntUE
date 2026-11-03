@@ -1,4 +1,5 @@
 #include "Labs/Lab11_RepNotify.h"
+#include "Core/BugHuntCase.h"
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 #include "Net/UnrealNetwork.h"
@@ -56,17 +57,18 @@ void ABH_Lab11::StartLab()
 		BugHunt::Note(TEXT("스탠드얼론으로 실행 중. 리슨 서버 + 클라이언트로도 실행해 보세요 (README 참고)."));
 	}
 
-	WaitForClientThen([this]
+	const int32 Damage = BugHunt::CaseInt(15, 5, 30);
+	WaitForClientThen([this, Damage]
 	{
 		ABH_NetHero* Hero = SpawnLabActor<ABH_NetHero>(FVector(0.f, 0.f, 100.f));
-		BugHunt::Note(TEXT("영웅 HP 100. 0.5초 간격으로 15씩 세 번 맞는다."));
+		BugHunt::Note(FString::Printf(TEXT("영웅 HP 100. 0.5초 간격으로 %d씩 세 번 맞는다."), Damage));
 
-		After(0.5f, [Hero] { Hero->ApplyDamage(15); });
-		After(1.0f, [Hero] { Hero->ApplyDamage(15); });
-		After(1.5f, [Hero] { Hero->ApplyDamage(15); });
+		After(0.5f, [Hero, Damage] { Hero->ApplyDamage(Damage); });
+		After(1.0f, [Hero, Damage] { Hero->ApplyDamage(Damage); });
+		After(1.5f, [Hero, Damage] { Hero->ApplyDamage(Damage); });
 
 		// 복제될 시간을 충분히 준 뒤 모든 머신에서 각자 검사한다.
-		After(2.5f, [Hero] { Hero->Multicast_CheckHud(55); });
+		After(2.5f, [Hero, Damage] { Hero->Multicast_CheckHud(100 - 3 * Damage); });
 		After(3.5f, [this] { FinishLab(); });
 	});
 }

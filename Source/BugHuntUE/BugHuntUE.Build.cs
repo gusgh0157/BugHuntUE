@@ -13,7 +13,8 @@ public class BugHuntUE : ModuleRules
 			"NetCore",
 			"UMG",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
+			"Json"
 		});
 
 		PublicIncludePaths.AddRange(new string[] {
