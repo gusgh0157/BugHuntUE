@@ -2,26 +2,34 @@
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 
+// 실행 출력 문구 (한국어, 일본어) / 実行時の出力文言（韓国語、日本語）
+namespace Lab10Text
+{
+BH_TEXT(MaxHealth, "슬라임 최대 HP (1.2 패치)", "スライムの最大 HP（1.2 パッチ）");
+BH_TEXT(MoveSpeed, "슬라임 이동 속도", "スライムの移動速度");
+}
+
 // 패치 노트 1.2: "슬라임이 너무 약하다는 의견이 많아 최대 HP를 100 → 150으로 올렸습니다."
+// [JA] パッチノート 1.2:「スライムが弱すぎるというご意見が多かったため、最大 HP を 100 → 150 に引き上げました。」
 
 ABH_Slime::ABH_Slime()
 {
 	MaxHealth = 150;    // 1.2 패치: 100 → 150
+	// [JA] 1.2 パッチ: 100 → 150
 	MoveSpeed = 220.f;
 }
 
-// [JA] パッチノート 1.2:「スライムが弱すぎるというご意見が多かったため、最大 HP を 100 → 150 に引き上げました。」
 void ABH_Lab10::StartLab()
 {
 	ABH_Slime* Slime = SpawnLabActor<ABH_Slime>();
-	BugHunt::Expect(TEXT("슬라임 최대 HP (1.2 패치)"), 150, Slime->MaxHealth);
-	// [JA] 1.2 パッチ: 100 → 150
-	BugHunt::Expect(TEXT("슬라임 이동 속도"), 220, FMath::RoundToInt(Slime->MoveSpeed));
+	BugHunt::Expect(BugHunt::Tr<Lab10Text::MaxHealth>(), 150, Slime->MaxHealth);
+	BugHunt::Expect(BugHunt::Tr<Lab10Text::MoveSpeed>(), 220, FMath::RoundToInt(Slime->MoveSpeed));
 	FinishLab();
 }
 
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // ============================================================================
 
 #pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
@@ -29,7 +37,11 @@ void ABH_Lab10::StartLab()
 // 150 이 맞게 들어갔나요? 그럼 랩이 읽은 100 은 생성자가 끝난 "뒤에" 누군가 덮어쓴 것입니다.
 // 게임이 도는 중에 콘솔(~)에 다음을 입력해 보세요:
 //     getall BH_Slime MaxHealth
-// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
+
+// [JA] コンストラクタの MaxHealth = 150 の行にブレークポイントを設定してラボを実行してください。止まったら F10 で進めてから MaxHealth を確認します。
+// [JA] 150 は正しく入りましたか？ では、ラボが読んだ 100 はコンストラクタが終わった「後で」誰かが上書きしたものです。
+// [JA] ゲームが動いている間にコンソール（~）で次を入力してみてください:
+// [JA]     getall BH_Slime MaxHealth
 #pragma endregion
 
 #pragma region 힌트 2 / ヒント 2
@@ -37,19 +49,8 @@ void ABH_Lab10::StartLab()
 // 생성자 중단점에서 멈췄을 때 조사식에 &MaxHealth 를 넣어 주소를 얻고,
 // 디버그 → 새 중단점 → 데이터 중단점 → 주소 입력, 바이트 수 4. 그리고 F5.
 // 어떤 함수에서 멈추나요? 호출 스택에서 Config, Archetype, InitProperties 같은 이름을 찾아보세요.
-
-// [JA] コンストラクタの MaxHealth = 150 の行にブレークポイントを設定してラボを実行してください。止まったら F10 で進めてから MaxHealth を確認します。
-// [JA] 150 は正しく入りましたか？ では、ラボが読んだ 100 はコンストラクタが終わった「後で」誰かが上書きしたものです。
-// [JA] ゲームが動いている間にコンソール（~）で次を入力してみてください:
-// [JA]     getall BH_Slime MaxHealth
 // (생성자 중단점은 클래스 기본 객체(CDO, 이름이 Default__BH_Slime)에 대해서도 한 번 불립니다. 엔진을 디버거로
 //  시작했다면 시작할 때 멈추는 그것이 CDO 입니다. 지역 창에서 this 의 이름을 확인하세요.)
-#pragma endregion
-
-#pragma region 힌트 3 / ヒント 3
-// 객체는 생성자 → (클래스 기본 객체의 값 복사) 순서로 만들어집니다. 클래스 기본 객체는 생성자를 돈 다음
-// Config 파일과 (블루프린트라면) 저장된 기본값을 덮어씁니다. 프로젝트의 Config 폴더에서 BH_Slime 을 찾아보세요.
-#pragma endregion
 
 // [JA] 「誰がこの値を変えたのか？」はデータ ブレークポイントの仕事です。
 // [JA] コンストラクタのブレークポイントで止まったときにウォッチに &MaxHealth を入れてアドレスを得て、
@@ -57,6 +58,12 @@ void ABH_Lab10::StartLab()
 // [JA] どの関数で止まりますか？ 呼び出し履歴で Config、Archetype、InitProperties のような名前を探してみてください。
 // [JA] （コンストラクタのブレークポイントは、クラスのデフォルト オブジェクト（CDO、名前は Default__BH_Slime）に対しても 1 回呼ばれます。エンジンをデバッガーで
 // [JA]  起動したなら、起動時に止まるのがその CDO です。ローカル ウィンドウで this の名前を確認してください。）
+#pragma endregion
+
+#pragma region 힌트 3 / ヒント 3
+// 객체는 생성자 → (클래스 기본 객체의 값 복사) 순서로 만들어집니다. 클래스 기본 객체는 생성자를 돈 다음
+// Config 파일과 (블루프린트라면) 저장된 기본값을 덮어씁니다. 프로젝트의 Config 폴더에서 BH_Slime 을 찾아보세요.
 
 // [JA] オブジェクトはコンストラクタ →（クラスのデフォルト オブジェクトの値をコピー）の順で作られます。クラスのデフォルト オブジェクトはコンストラクタを通った後、
 // [JA] Config ファイルと（ブループリントなら）保存された既定値で上書きされます。プロジェクトの Config フォルダで BH_Slime を探してみてください。
+#pragma endregion

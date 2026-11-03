@@ -3,6 +3,18 @@
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 
+// 실행 출력 문구 (한국어, 일본어) / 実行時の出力文言（韓国語、日本語）
+namespace Lab24Text
+{
+BH_TEXT(Greeting,      "어서 오게, 여행자.", "よく来たな、旅の人。");
+BH_TEXT(Question,      "질문 %d", "質問 %d");
+BH_TEXT(Answer,        "대답 %d", "返答 %d");
+BH_TEXT(Built,         "대화 노드 %d개를 만들었다. 질문 %d → 대답 → 이전으로 두 번 → 대화 끝.", "会話ノードを %d 個作った。質問 %d → 返答 → 「前へ」を 2 回 → 会話終了。");
+BH_TEXT(AnswerCheck,   "고른 질문의 대답 == \"대답 %d\" (실제: \"%s\")", "選んだ質問の返答 == \"返答 %d\"（実際: \"%s\"）");
+BH_TEXT(BackCheck,     "이전으로 두 번 == 첫 인사 (실제: \"%s\")", "「前へ」を 2 回 == 最初のあいさつ（実際: \"%s\"）");
+BH_TEXT(NodesLeft,     "대화가 끝난 뒤 메모리에 남은 대화 노드", "会話が終わった後にメモリに残った会話ノード");
+}
+
 int32 FBH_DialogueNode::NumAlive = 0;
 
 FBH_DialogueNode::FBH_DialogueNode(const FString& InLine)
@@ -29,11 +41,11 @@ TSharedPtr<FBH_DialogueNode> AddChoice(const TSharedPtr<FBH_DialogueNode>& Paren
 
 void ABH_Npc::StartConversation(int32 NumChoices)
 {
-	Root = MakeShared<FBH_DialogueNode>(TEXT("어서 오게, 여행자."));
+	Root = MakeShared<FBH_DialogueNode>(BugHunt::Tr<Lab24Text::Greeting>());
 	for (int32 i = 0; i < NumChoices; ++i)
 	{
-		TSharedPtr<FBH_DialogueNode> Choice = AddChoice(Root, FString::Printf(TEXT("질문 %d"), i + 1));
-		AddChoice(Choice, FString::Printf(TEXT("대답 %d"), i + 1));
+		TSharedPtr<FBH_DialogueNode> Choice = AddChoice(Root, BugHunt::Fmt<Lab24Text::Question>(i + 1));
+		AddChoice(Choice, BugHunt::Fmt<Lab24Text::Answer>(i + 1));
 	}
 	Current = Root;
 }
@@ -73,7 +85,7 @@ void ABH_Lab24::StartLab()
 
 	ABH_Npc* Npc = SpawnLabActor<ABH_Npc>();
 	Npc->StartConversation(NumChoices);
-	BugHunt::Note(FString::Printf(TEXT("대화 노드 %d개를 만들었다. 질문 %d → 대답 → 이전으로 두 번 → 대화 끝."),
+	BugHunt::Note(BugHunt::Fmt<Lab24Text::Built>(
 		FBH_DialogueNode::NumAlive - AliveBefore, Picked + 1));
 
 	Npc->Choose(Picked);
@@ -84,16 +96,17 @@ void ABH_Lab24::StartLab()
 	const FString BackToStart = Npc->CurrentLine();
 	Npc->EndConversation();
 
-	BugHunt::ExpectTrue(FString::Printf(TEXT("고른 질문의 대답 == \"대답 %d\" (실제: \"%s\")"), Picked + 1, *Answer),
-		Answer == FString::Printf(TEXT("대답 %d"), Picked + 1));
-	BugHunt::ExpectTrue(FString::Printf(TEXT("이전으로 두 번 == 첫 인사 (실제: \"%s\")"), *BackToStart),
-		BackToStart == TEXT("어서 오게, 여행자."));
-	BugHunt::Expect(TEXT("대화가 끝난 뒤 메모리에 남은 대화 노드"), 0, FBH_DialogueNode::NumAlive - AliveBefore);
+	BugHunt::ExpectTrue(BugHunt::Fmt<Lab24Text::AnswerCheck>(Picked + 1, *Answer),
+		Answer == BugHunt::Fmt<Lab24Text::Answer>(Picked + 1));
+	BugHunt::ExpectTrue(BugHunt::Fmt<Lab24Text::BackCheck>(*BackToStart),
+		BackToStart == BugHunt::Tr<Lab24Text::Greeting>());
+	BugHunt::Expect(BugHunt::Tr<Lab24Text::NodesLeft>(), 0, FBH_DialogueNode::NumAlive - AliveBefore);
 	FinishLab();
 }
 
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // ============================================================================
 
 #pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
@@ -101,36 +114,35 @@ void ABH_Lab24::StartLab()
 // FBH_DialogueNode 소멸자에 중단점을 걸고 랩을 돌려 보세요. 몇 번 멈추나요?
 // EndConversation 의 Root.Reset() 줄에서 멈춘 뒤 조사식에 Root 를 넣어 펼쳐 보세요.
 // TSharedPtr 의 참조 수(SharedReferenceCount)가 보입니다. 아무도 안 쓸 텐데 왜 1이 아닐까요?
-#pragma endregion
-
-#pragma region 힌트 2 / ヒント 2
-// 루트의 참조 수를 세어 보세요: Root 멤버 1, Current 1(대화 중), 그리고 각 선택지의 Parent 가 하나씩.
-// Root 가 Reset 되어도 자식들의 Parent 가 루트를 붙잡고, 루트의 Choices 가 자식들을 붙잡습니다.
-// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
-// 서로가 서로를 붙잡는 고리(순환 참조)는 참조 수가 절대 0 이 되지 않습니다. 크래시도 경고도 없이 메모리만 샙니다.
-// (GC 가 있는 UObject 라면 고리째 수거되지만, TSharedPtr 는 참조 수만 봅니다.)
-#pragma endregion
-
-#pragma region 힌트 3 / ヒント 3
-// 소유하지 않는 쪽(자식 → 부모)은 TWeakPtr 로 바꾸세요.
-//     TWeakPtr<FBH_DialogueNode> Parent;
 
 // [JA] EndConversation が Root と Current を両方 Reset したのに、ノードが 1 つも消えていません。
 // [JA] FBH_DialogueNode のデストラクターにブレークポイントを置いてラボを実行してみてください。何回止まりますか？
 // [JA] EndConversation の Root.Reset() の行で止めた後、ウォッチに Root を入れて展開してみてください。
 // [JA] TSharedPtr の参照カウント（SharedReferenceCount）が見えます。誰も使わないはずなのに、なぜ 1 ではないのでしょう？
-// 쓸 때는 Pin() 으로 잠깐 TSharedPtr 를 얻습니다:
-//     if (TSharedPtr<FBH_DialogueNode> Up = Current->Parent.Pin()) { Current = Up; }
-// 규칙: 소유 방향(부모 → 자식)은 TSharedPtr/TSharedRef, 거꾸로 가리키는 쪽은 TWeakPtr.
 #pragma endregion
+
+#pragma region 힌트 2 / ヒント 2
+// 루트의 참조 수를 세어 보세요: Root 멤버 1, Current 1(대화 중), 그리고 각 선택지의 Parent 가 하나씩.
+// Root 가 Reset 되어도 자식들의 Parent 가 루트를 붙잡고, 루트의 Choices 가 자식들을 붙잡습니다.
+// 서로가 서로를 붙잡는 고리(순환 참조)는 참조 수가 절대 0 이 되지 않습니다. 크래시도 경고도 없이 메모리만 샙니다.
+// (GC 가 있는 UObject 라면 고리째 수거되지만, TSharedPtr 는 참조 수만 봅니다.)
 
 // [JA] ルートの参照カウントを数えてみてください: Root メンバーで 1、Current で 1（会話中）、そして各選択肢の Parent が 1 つずつ。
 // [JA] Root が Reset されても子の Parent がルートをつかみ、ルートの Choices が子をつかんでいます。
 // [JA] 互いが互いをつかむ輪（循環参照）は、参照カウントが決して 0 になりません。クラッシュも警告もなく、メモリだけがリークします。
 // [JA] （GC がある UObject なら輪ごと回収されますが、TSharedPtr は参照カウントしか見ません。）
+#pragma endregion
+
+#pragma region 힌트 3 / ヒント 3
+// 소유하지 않는 쪽(자식 → 부모)은 TWeakPtr 로 바꾸세요.
+//     TWeakPtr<FBH_DialogueNode> Parent;
+// 쓸 때는 Pin() 으로 잠깐 TSharedPtr 를 얻습니다:
+//     if (TSharedPtr<FBH_DialogueNode> Up = Current->Parent.Pin()) { Current = Up; }
+// 규칙: 소유 방향(부모 → 자식)은 TSharedPtr/TSharedRef, 거꾸로 가리키는 쪽은 TWeakPtr.
 
 // [JA] 所有しない側（子 → 親）は TWeakPtr に変えてください。
 // [JA]     TWeakPtr<FBH_DialogueNode> Parent;
 // [JA] 使うときは Pin() で一時的に TSharedPtr を得ます:
 // [JA]     if (TSharedPtr<FBH_DialogueNode> Up = Current->Parent.Pin()) { Current = Up; }
 // [JA] ルール: 所有する向き（親 → 子）は TSharedPtr/TSharedRef、逆向きに指す側は TWeakPtr。
+#pragma endregion

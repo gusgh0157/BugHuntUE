@@ -2,6 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Async/Future.h"
+#include "Core/BugHuntText.h"
+
+namespace HangText
+{
+// 채점기는 이 낱말로 TIMEOUT 을 알아본다 (두 언어 모두). / 採点機はこの語で TIMEOUT を判定します（両言語とも）。
+BH_TEXT(HangWord, "응답 없음", "応答なし");
+BH_TEXT(HangLine, "응답 없음 (%s) - %s", "応答なし（%s） - %s");
+BH_TEXT(Exceeded, "%.0f ms / %lld회 초과", "%.0f ms / %lld 回超過");
+BH_TEXT(Waited,   "%.0f ms 기다림, 데드락 의심", "%.0f ms 待機、デッドロックの疑い");
+}
 
 // 10부(동시성과 멈춤)의 멈춤 랩용 안전장치. 이 파일에는 버그가 없다.
 //
@@ -52,7 +62,7 @@ bool WaitWithBudget(const TFuture<ResultType>& Future, const FString& What)
 	{
 		return true;
 	}
-	ReportHang(What, FString::Printf(TEXT("%.0f ms 기다림, 데드락 의심"), (FPlatformTime::Seconds() - Start) * 1000.0));
+	ReportHang(What, Fmt<HangText::Waited>((FPlatformTime::Seconds() - Start) * 1000.0));
 	return false;
 }
 }

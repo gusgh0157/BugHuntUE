@@ -3,6 +3,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
+#include "Core/BugHuntText.h"
 
 namespace BugHunt
 {
@@ -35,11 +36,11 @@ bool Expect(const FString& What, int64 Expected, int64 Actual)
 	if (Expected == Actual)
 	{
 		++GPassed;
-		Print(FString::Printf(TEXT("[PASS] %s (값: %lld)"), *What, Actual), FColor::Green);
+		Print(Fmt<ReportText::PassValue>(*What, Actual), FColor::Green);
 		return true;
 	}
 	++GFailed;
-	Print(FString::Printf(TEXT("[FAIL] %s (기대: %lld, 실제: %lld)"), *What, Expected, Actual), FColor::Red);
+	Print(Fmt<ReportText::FailValue>(*What, Expected, Actual), FColor::Red);
 	return false;
 }
 
@@ -75,10 +76,10 @@ FString NetTag(const UObject* WorldContext)
 	}
 	switch (World->GetNetMode())
 	{
-	case NM_Standalone:      return TEXT("[스탠드얼론]");
-	case NM_DedicatedServer: return TEXT("[데디케이티드 서버]");
-	case NM_ListenServer:    return TEXT("[리슨 서버]");
-	case NM_Client:          return TEXT("[클라이언트]");
+	case NM_Standalone:      return Tr<ReportText::Standalone>();
+	case NM_DedicatedServer: return Tr<ReportText::Dedicated>();
+	case NM_ListenServer:    return Tr<ReportText::ListenServer>();
+	case NM_Client:          return Tr<ReportText::Client>();
 	default:                 return TEXT("[?]");
 	}
 }
@@ -87,7 +88,7 @@ void ExitIfAutomated()
 {
 	if (FParse::Param(FCommandLine::Get(), TEXT("BugHuntExit")))
 	{
-		UE_LOG(LogBugHunt, Display, TEXT("-BugHuntExit: 종료합니다."));
+		UE_LOG(LogBugHunt, Display, TEXT("%s"), Tr<ReportText::Exiting>());
 		RequestEngineExit(TEXT("BugHunt lab finished"));
 	}
 }

@@ -1,5 +1,7 @@
 # BugHunt UE — 언리얼 엔진 C++ 버그 추적 실습
 
+[日本語](README.ja.md)
+
 [BugHunt](https://github.com/gusgh0157/BugHunt)(C++ 콘솔판)의 언리얼 엔진 버전입니다.
 버그가 **일부러 심어진** 작은 게임 코드 모음이고, 이번에는 **언리얼에서만 생기는** 버그들입니다.
 

@@ -2,7 +2,16 @@
 #include "Core/BugHuntReport.h"
 #include "BugHuntUE.h"
 
+// 실행 출력 문구 (한국어, 일본어) / 実行時の出力文言（韓国語、日本語）
+namespace Lab02Text
+{
+BH_TEXT(NoScore,   "점수 없음", "スコアなし");
+BH_TEXT(KaelScore, "Kael 점수", "Kael のスコア");
+BH_TEXT(HudShows,  "HUD 표시 == \"Kael 30\" (실제: \"%s\")", "HUD 表示 == \"Kael 30\"（実際: \"%s\"）");
+}
+
 // 게임이 시작되면 점수 관리자가 점수판 HUD를 띄우고, HUD는 점수가 바뀔 때마다 글자를 갱신한다.
+// [JA] ゲームが始まるとスコア管理者がスコアボード HUD を表示し、HUD はスコアが変わるたびに文字列を更新する。
 
 void UBH_Scoreboard::AddScore(const FString& Player, int32 Points)
 {
@@ -11,7 +20,6 @@ void UBH_Scoreboard::AddScore(const FString& Player, int32 Points)
 	OnScoreChanged.Broadcast(Player, Score);
 }
 
-// [JA] ゲームが始まるとスコア管理者がスコアボード HUD を表示し、HUD はスコアが変わるたびに文字列を更新する。
 int32 UBH_Scoreboard::ScoreOf(const FString& Player) const
 {
 	const int32* Score = Scores.Find(Player);
@@ -28,23 +36,23 @@ void ABH_ScoreManager::BeginPlay()
 	Super::BeginPlay();
 
 	// 화면부터 띄우고
+	// [JA] まず画面を表示して
 	FActorSpawnParameters Params;
 	Params.Owner = this;
 	Hud = GetWorld()->SpawnActor<ABH_ScoreHud>(ABH_ScoreHud::StaticClass(), FTransform::Identity, Params);
 
 	// 점수판을 준비한다.
+	// [JA] スコアボードを用意する。
 	Scoreboard = NewObject<UBH_Scoreboard>(this, TEXT("Scoreboard"));
 }
 
-	// [JA] まず画面を表示して
 void ABH_ScoreHud::BeginPlay()
 {
 	Super::BeginPlay();
 
 	ABH_ScoreManager* Manager = CastChecked<ABH_ScoreManager>(GetOwner());
-	// [JA] スコアボードを用意する。
 	Manager->GetScoreboard()->OnScoreChanged.AddUObject(this, &ABH_ScoreHud::HandleScoreChanged);
-	DisplayedText = TEXT("점수 없음");
+	DisplayedText = BugHunt::Tr<Lab02Text::NoScore>();
 }
 
 void ABH_ScoreHud::HandleScoreChanged(const FString& Player, int32 NewScore)
@@ -59,43 +67,43 @@ void ABH_Lab02::StartLab()
 	Manager->GetScoreboard()->AddScore(TEXT("Kael"), 10);
 	Manager->GetScoreboard()->AddScore(TEXT("Kael"), 20);
 
-	BugHunt::Expect(TEXT("Kael 점수"), 30, Manager->GetScoreboard()->ScoreOf(TEXT("Kael")));
-	BugHunt::ExpectTrue(FString::Printf(TEXT("HUD 표시 == \"Kael 30\" (실제: \"%s\")"), *Manager->Hud->DisplayedText),
+	BugHunt::Expect(BugHunt::Tr<Lab02Text::KaelScore>(), 30, Manager->GetScoreboard()->ScoreOf(TEXT("Kael")));
+	BugHunt::ExpectTrue(BugHunt::Fmt<Lab02Text::HudShows>(*Manager->Hud->DisplayedText),
 		Manager->Hud->DisplayedText == TEXT("Kael 30"));
 	FinishLab();
 }
 
 // ============================================================================
 // 힌트: 막힐 때 하나씩만 펼치세요. (Ctrl+M, Ctrl+O = 전부 접기)
+// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // ============================================================================
 
 #pragma region 힌트 1 / ヒント 1 (먼저 호출 스택을 보고 펼치세요 / まず呼び出し履歴を見てから開いてください)
 // 멈춘 곳은 ABH_ScoreHud::BeginPlay 입니다. 이 줄에서 nullptr 인 것은 Manager 인가요,
 // Manager->GetScoreboard() 의 결과인가요? 조사식 창에 Manager->Scoreboard 를 넣어 보세요.
+
+// [JA] 止まった場所は ABH_ScoreHud::BeginPlay です。この行で nullptr なのは Manager ですか、
+// [JA] それとも Manager->GetScoreboard() の結果ですか？ ウォッチ ウィンドウに Manager->Scoreboard を入れてみてください。
 #pragma endregion
 
 #pragma region 힌트 2 / ヒント 2
-// ヒント: 行き詰まったときに 1 つずつ開いてください。（Ctrl+M, Ctrl+O = すべて折りたたむ）
 // 호출 스택을 아래로 내려가 보세요. ABH_ScoreHud::BeginPlay 와 ABH_ScoreManager::BeginPlay 사이에
 // UWorld::SpawnActor, AActor::FinishSpawning, AActor::DispatchBeginPlay 같은 엔진 프레임이 있습니다.
 // 즉 HUD의 BeginPlay는 "나중에"가 아니라 SpawnActor 호출 안에서 바로 실행됐습니다.
 // 매니저의 BeginPlay 프레임을 더블클릭하면 초록 화살표가 어느 줄을 가리키나요? 그때 Scoreboard는?
-#pragma endregion
-
-// [JA] 止まった場所は ABH_ScoreHud::BeginPlay です。この行で nullptr なのは Manager ですか、
-// [JA] それとも Manager->GetScoreboard() の結果ですか？ ウォッチ ウィンドウに Manager->Scoreboard を入れてみてください。
-
-#pragma region 힌트 3 / ヒント 3
-// 게임이 이미 시작된 월드에서 SpawnActor 를 하면, 생성자 → PostInitializeComponents → BeginPlay 가
-// SpawnActor 가 돌아오기 전에 전부 실행됩니다.
-// 다른 객체가 쓸 멤버는 언제 만들어 두는 게 안전할까요? (순서 바꾸기 / 생성자 / PostInitializeComponents)
-#pragma endregion
 
 // [JA] 呼び出し履歴を下へたどってみてください。ABH_ScoreHud::BeginPlay と ABH_ScoreManager::BeginPlay の間に
 // [JA] UWorld::SpawnActor、AActor::FinishSpawning、AActor::DispatchBeginPlay のようなエンジンのフレームがあります。
 // [JA] つまり HUD の BeginPlay は「あとで」ではなく、SpawnActor の呼び出しの中ですぐに実行されました。
 // [JA] マネージャーの BeginPlay フレームをダブルクリックすると、緑の矢印はどの行を指していますか？ そのときの Scoreboard は？
+#pragma endregion
+
+#pragma region 힌트 3 / ヒント 3
+// 게임이 이미 시작된 월드에서 SpawnActor 를 하면, 생성자 → PostInitializeComponents → BeginPlay 가
+// SpawnActor 가 돌아오기 전에 전부 실행됩니다.
+// 다른 객체가 쓸 멤버는 언제 만들어 두는 게 안전할까요? (순서 바꾸기 / 생성자 / PostInitializeComponents)
 
 // [JA] ゲームがすでに始まっているワールドで SpawnActor をすると、コンストラクター → PostInitializeComponents → BeginPlay が
 // [JA] SpawnActor から戻る前にすべて実行されます。
 // [JA] 他のオブジェクトが使うメンバーは、いつ作っておくのが安全でしょうか？（順番を入れ替える / コンストラクター / PostInitializeComponents）
+#pragma endregion
