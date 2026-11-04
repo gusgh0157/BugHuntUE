@@ -11,7 +11,7 @@ namespace Lab52Text
 BH_TEXT(WaitSave,  "자동 저장 끝나기를 기다림", "オートセーブの終了を待機");
 BH_TEXT(SavedLog,  "  %.2f초: 저장 완료 \"%s\"", "  %.2f 秒: 保存完了 \"%s\"");
 BH_TEXT(Start,     "자동 저장 시작: \"%s\". 디스크 쓰기 %.1f초. 저장 직후 상자를 열어 골드가 늘어난다.", "オートセーブ開始: \"%s\"。ディスク書き込み %.1f 秒。保存の直後に宝箱を開けてゴールドが増える。");
-BH_TEXT(Blocked,   "자동 저장이 게임을 멈춘 시간 < 50 ms (실제: %.0f ms)", "オートセーブがゲームを止めた時間 < 50 ms（実際: %.0f ms）");
+BH_TEXT(Blocked,   "자동 저장이 게임을 세우지 않았다: 요청한 프레임보다 뒤에 저장이 끝났다 (실제: %d프레임 뒤, AutoSave 호출 %.0f ms)", "オートセーブがゲームを止めなかった: 要求したフレームより後に保存が終わった（実際: %d フレーム後、AutoSave 呼び出し %.0f ms）");
 BH_TEXT(Saved,     "저장 완료", "保存完了");
 BH_TEXT(Content,   "저장 내용 == \"%s\" (실제: \"%s\")", "保存内容 == \"%s\"（実際: \"%s\"）");
 }
@@ -54,6 +54,7 @@ void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
 void ABH_SaveSystem::OnSaved(const FString& Text)
 {
 	bSaved = true;
+	SavedFrame = GFrameCounter;
 	SavedText = Text;
 	UE_LOG(LogBugHunt, Log, TEXT("%s"), *BugHunt::Fmt<Lab52Text::SavedLog>(GetWorld()->GetTimeSeconds(), *Text));
 }
@@ -69,6 +70,7 @@ void ABH_Lab52::StartLab()
 	const FString Expected = ABH_SaveSystem::Describe(Hero);
 	BugHunt::Note(BugHunt::Fmt<Lab52Text::Start>(*Expected, Save->WriteSeconds));
 
+	const uint64 RequestFrame = GFrameCounter;
 	const double Start = FPlatformTime::Seconds();
 	Save->AutoSave(Hero);
 	const double BlockedMs = (FPlatformTime::Seconds() - Start) * 1000.0;
@@ -76,9 +78,12 @@ void ABH_Lab52::StartLab()
 	Hero->Gold += 50;   // 저장을 요청한 "뒤"의 변화. 저장 파일에 들어가면 안 된다.
 	// [JA] 保存を要求した「後」の変化。セーブファイルに入ってはいけない。
 
-	After(Save->WriteSeconds + 1.0f, [this, Save, Expected, BlockedMs]
+	WhenDone([Save] { return Save->bSaved; }, Save->WriteSeconds + 10.f, [this, Save, Expected, RequestFrame, BlockedMs]
 	{
-		BugHunt::ExpectTrue(BugHunt::Fmt<Lab52Text::Blocked>(BlockedMs), BlockedMs < 50.0);
+		// 시간(ms)이 아니라 프레임으로 판정한다. 저장을 기다리며 게임 스레드를 세우면 요청한 프레임 안에서 끝난다.
+		// [JA] 時間（ms）ではなくフレームで判定する。保存を待ってゲームスレッドを止めると、要求したフレームの中で終わってしまう。
+		const int32 Frames = Save->bSaved ? static_cast<int32>(Save->SavedFrame - RequestFrame) : 0;
+		BugHunt::ExpectTrue(BugHunt::Fmt<Lab52Text::Blocked>(Frames, BlockedMs), Frames > 0);
 		BugHunt::ExpectTrue(BugHunt::Tr<Lab52Text::Saved>(), Save->bSaved);
 		BugHunt::ExpectTrue(BugHunt::Fmt<Lab52Text::Content>(*Expected, *Save->SavedText), Save->SavedText == Expected);
 		FinishLab();

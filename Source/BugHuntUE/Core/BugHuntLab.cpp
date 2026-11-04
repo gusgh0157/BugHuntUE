@@ -66,6 +66,24 @@ void ABugHuntLab::After(float Seconds, TFunction<void()> Func)
 	GetWorldTimerManager().SetTimer(Unused, FTimerDelegate::CreateWeakLambda(this, MoveTemp(Func)), Seconds, false);
 }
 
+void ABugHuntLab::WhenDone(TFunction<bool()> Done, float MaxRealSeconds, TFunction<void()> Func)
+{
+	PollDone(MoveTemp(Done), FPlatformTime::Seconds() + MaxRealSeconds, MoveTemp(Func));
+}
+
+void ABugHuntLab::PollDone(TFunction<bool()> Done, double Deadline, TFunction<void()> Func)
+{
+	if (Done() || FPlatformTime::Seconds() > Deadline)
+	{
+		Func();
+		return;
+	}
+	GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this, Done, Deadline, Func]
+	{
+		PollDone(Done, Deadline, Func);
+	}));
+}
+
 int32 ABugHuntLab::CountRemotePlayers(const UWorld* World)
 {
 	int32 Remote = 0;

@@ -43,6 +43,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	bool bSaved = false;
 
+	// 저장이 끝난 프레임 (GFrameCounter)
+	// [JA] 保存が終わったフレーム（GFrameCounter）
+	uint64 SavedFrame = 0;
+
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	FString SavedText;
 

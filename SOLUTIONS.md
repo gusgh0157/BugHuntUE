@@ -894,7 +894,7 @@ void ABH_PlayerController::Server_OpenChest_Implementation(ABH_Chest* Chest)
 
 ## Lab 48 — 다른 액터의 Tick 이 바꿔 줄 값을 게임 스레드에서 while 로 기다림
 ```
-틀린 결과:     응답 없음 (2000 ms) TIMEOUT. 탈 때 엘리베이터가 와 있었다 FAIL, 게임이 멈춘 시간 2000 ms FAIL
+틀린 결과:     응답 없음 (2000 ms) TIMEOUT. 탈 때 엘리베이터가 와 있었다 FAIL, 기다리는 동안 게임이 계속 돌았다 FAIL (부른 프레임 안에서 탐: 0프레임 뒤)
 멈춘 위치:     HangBudgetSeconds 30 → 모두 중단 → 스레드 창 GameThread → RideElevator 의 while
                조사식 Elevator->Height = 0, TicksWhileMoving = 0. F5 → 모두 중단을 반복해도 그대로
 진짜 원인:     Tick 은 게임 스레드가 다음 프레임에 부른다. 게임 스레드가 while 에서 기다리는 동안 다음 프레임은 오지 않는다.
@@ -980,7 +980,7 @@ Async(EAsyncExecution::Thread, [WeakFeed, Points]
 
 ## Lab 52 — 게임 스레드가 작업 스레드 결과를 동기로 기다리는데, 작업 스레드는 게임 스레드를 기다림
 ```
-틀린 결과:     응답 없음 (2000 ms 기다림, 데드락 의심) TIMEOUT. 게임이 멈춘 시간 2000 ms, 저장 완료 FAIL
+틀린 결과:     응답 없음 (2000 ms 기다림, 데드락 의심) TIMEOUT. 자동 저장이 게임을 세우지 않았다 FAIL, 저장 완료 FAIL
 멈춘 위치:     HangBudgetSeconds 30 → 모두 중단 → 병렬 스택:
                  GameThread:  ABH_SaveSystem::AutoSave → WaitWithBudget → TFuture::WaitFor
                  작업 스레드: AutoSave 의 람다 → Snapshot.Get() → TFuture::Get
@@ -1007,7 +1007,7 @@ void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
     });
 }
 ```
-스냅샷만 먼저 뜨고 `Done.Get()`을 남기면 데드락은 풀리지만 "게임이 멈춘 시간 < 50 ms"가 FAIL 이다 (디스크 쓰기 0.3초만큼 히치). 작업 스레드에서 `Hero->Gold`를 직접 읽으면 데이터 경쟁이고, 저장 직후의 +50 이 섞여 들어가 "저장 내용"이 FAIL 일 수 있다.
+스냅샷만 먼저 뜨고 `Done.Get()`을 남기면 데드락은 풀리지만 "자동 저장이 게임을 세우지 않았다"가 FAIL 이다 (저장이 요청한 프레임 안에서 끝난다 = 디스크 쓰기 0.3초만큼 히치). 작업 스레드에서 `Hero->Gold`를 직접 읽으면 데이터 경쟁이고, 저장 직후의 +50 이 섞여 들어가 "저장 내용"이 FAIL 일 수 있다.
 **교훈:** 게임 스레드에서 `Future.Get()`, `Event->Wait()`, `FScopeLock`으로 오래 기다리지 않는다. 특히 기다리는 상대가 게임 스레드에 일을 보내는 구조(로딩, 세이브, 에셋 스트리밍 콜백)라면 그대로 데드락이다. 잠금 두 개를 서로 반대 순서로 잡는 데드락(A→B / B→A)도 병렬 스택에서 같은 모양으로 보인다: 두 스레드가 서로 상대가 쥔 것을 기다린다.
 
 # 12부: 성능

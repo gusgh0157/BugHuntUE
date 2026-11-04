@@ -49,6 +49,10 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	bool bBoarded = false;
 
+	// 탄 프레임 (GFrameCounter)
+	// [JA] 乗ったフレーム（GFrameCounter）
+	uint64 BoardFrame = 0;
+
 	// 탈 때 엘리베이터가 도착해 있었나
 	// [JA] 乗るときにエレベーターが到着していたか
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")

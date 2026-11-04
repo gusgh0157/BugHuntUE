@@ -13,7 +13,7 @@ BH_TEXT(BoardLog,     "  %.2f초: 승객 탑승 (엘리베이터 높이 %.0f)", 
 BH_TEXT(Plan,         "승객이 높이 %.0f 에서 엘리베이터를 부른다. 속도 %.0f 이면 %.2f초 뒤 도착.", "乗客が高さ %.0f でエレベーターを呼ぶ。速度 %.0f なら %.2f 秒後に到着。");
 BH_TEXT(Boarded,      "승객이 탔다", "乗客が乗った");
 BH_TEXT(WasThere,     "탈 때 엘리베이터가 와 있었다", "乗るときにエレベーターが来ていた");
-BH_TEXT(Blocked,      "엘리베이터를 부르는 동안 게임이 멈춘 시간 < 100 ms (실제: %.0f ms)", "エレベーターを呼んでいる間にゲームが止まった時間 < 100 ms（実際: %.0f ms）");
+BH_TEXT(Blocked,      "기다리는 동안 게임이 계속 돌았다: 부른 프레임보다 뒤에 탔다 (실제: %d프레임 뒤, 부르기 호출 %.0f ms)", "待っている間もゲームが動き続けた: 呼んだフレームより後に乗った（実際: %d フレーム後、呼び出し %.0f ms）");
 BH_TEXT(Arrived,      "엘리베이터 도착", "エレベーター到着");
 }
 
@@ -66,6 +66,7 @@ void ABH_Passenger::RideElevator(ABH_Elevator* Elevator, float TargetHeight, flo
 void ABH_Passenger::Board(ABH_Elevator* Elevator)
 {
 	bBoarded = true;
+	BoardFrame = GFrameCounter;
 	bElevatorWasThere = Elevator->bArrived;
 	UE_LOG(LogBugHunt, Log, TEXT("%s"), *BugHunt::Fmt<Lab48Text::BoardLog>(GetWorld()->GetTimeSeconds(), Elevator->Height));
 }
@@ -80,16 +81,19 @@ void ABH_Lab48::StartLab()
 	BugHunt::Note(BugHunt::Fmt<Lab48Text::Plan>(
 		TargetHeight, Speed, TargetHeight / Speed));
 
+	const uint64 CallFrame = GFrameCounter;
 	const double CallStart = FPlatformTime::Seconds();
 	Passenger->RideElevator(Elevator, TargetHeight, Speed);
 	const double BlockedMs = (FPlatformTime::Seconds() - CallStart) * 1000.0;
 
-	After(TargetHeight / Speed + 1.0f, [this, Elevator, Passenger, BlockedMs]
+	After(TargetHeight / Speed + 1.0f, [this, Elevator, Passenger, CallFrame, BlockedMs]
 	{
 		BugHunt::ExpectTrue(BugHunt::Tr<Lab48Text::Boarded>(), Passenger->bBoarded);
 		BugHunt::ExpectTrue(BugHunt::Tr<Lab48Text::WasThere>(), Passenger->bElevatorWasThere);
-		BugHunt::ExpectTrue(BugHunt::Fmt<Lab48Text::Blocked>(BlockedMs),
-			BlockedMs < 100.0);
+		// 시간(ms)이 아니라 프레임으로 판정한다. 게임 스레드를 세우면 부른 프레임 안에서 탄다.
+		// [JA] 時間（ms）ではなくフレームで判定する。ゲームスレッドを止めると、呼んだフレームの中で乗ってしまう。
+		const int32 Frames = Passenger->bBoarded ? static_cast<int32>(Passenger->BoardFrame - CallFrame) : 0;
+		BugHunt::ExpectTrue(BugHunt::Fmt<Lab48Text::Blocked>(Frames, BlockedMs), Frames > 0);
 		BugHunt::ExpectTrue(BugHunt::Tr<Lab48Text::Arrived>(), Elevator->bArrived);
 		FinishLab();
 	});

@@ -898,7 +898,7 @@ void ABH_PlayerController::Server_OpenChest_Implementation(ABH_Chest* Chest)
 
 ## ラボ 48 — 別のアクターの Tick が変えてくれる値をゲームスレッドで while で待つ
 ```
-間違った結果:     応答なし (2000 ms) TIMEOUT。乗るときにエレベーターが来ていた FAIL、ゲームが止まった時間 2000 ms FAIL
+間違った結果:     応答なし (2000 ms) TIMEOUT。乗るときにエレベーターが来ていた FAIL、待っている間もゲームが動き続けた FAIL (呼んだフレームの中で乗った: 0 フレーム後)
 止まった位置:     HangBudgetSeconds 30 → すべて中断 (Break All) → スレッド ウィンドウ (Threads) で GameThread → RideElevator の while
                   ウォッチ式 Elevator->Height = 0、TicksWhileMoving = 0。F5 → すべて中断を繰り返しても同じまま
 本当の原因:       Tick はゲームスレッドが次のフレームで呼ぶ。ゲームスレッドが while で待っている間、次のフレームは来ない。
@@ -984,7 +984,7 @@ Async(EAsyncExecution::Thread, [WeakFeed, Points]
 
 ## ラボ 52 — ゲームスレッドがワーカースレッドの結果を同期で待ち、ワーカースレッドはゲームスレッドを待つ
 ```
-間違った結果:     応答なし (2000 ms 待機、デッドロックの疑い) TIMEOUT。ゲームが止まった時間 2000 ms、保存完了 FAIL
+間違った結果:     応答なし (2000 ms 待機、デッドロックの疑い) TIMEOUT。オートセーブがゲームを止めなかった FAIL、保存完了 FAIL
 止まった位置:     HangBudgetSeconds 30 → すべて中断 → 並列スタック:
                      GameThread:         ABH_SaveSystem::AutoSave → WaitWithBudget → TFuture::WaitFor
                      ワーカースレッド:   AutoSave のラムダ → Snapshot.Get() → TFuture::Get
@@ -1011,7 +1011,7 @@ void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
     });
 }
 ```
-スナップショットだけ先に取って `Done.Get()` を残すと、デッドロックは解けますが「ゲームが止まった時間 < 50 ms」が FAIL です (ディスク書き込みの 0.3 秒分のヒッチ)。ワーカースレッドで `Hero->Gold` を直接読むとデータ競合になり、保存直後の +50 が混ざって「保存内容」が FAIL になることがあります。
+スナップショットだけ先に取って `Done.Get()` を残すと、デッドロックは解けますが「オートセーブがゲームを止めなかった」が FAIL です (保存が要求したフレームの中で終わる = ディスク書き込みの 0.3 秒分のヒッチ)。ワーカースレッドで `Hero->Gold` を直接読むとデータ競合になり、保存直後の +50 が混ざって「保存内容」が FAIL になることがあります。
 **教訓:** ゲームスレッドで `Future.Get()`、`Event->Wait()`、`FScopeLock` で長く待ちません。特に、待つ相手がゲームスレッドに仕事を送る構造 (ロード、セーブ、アセットストリーミングのコールバック) なら、そのままデッドロックです。2 つのロックを互いに逆の順序で取るデッドロック (A→B / B→A) も、並列スタックでは同じ形に見えます: 2 つのスレッドがお互いに相手の握っているものを待っています。
 
 # 第12部: パフォーマンス

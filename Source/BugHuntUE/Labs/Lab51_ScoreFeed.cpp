@@ -44,7 +44,7 @@ void ABH_Lab51::StartLab()
 		}
 	});
 
-	After(1.0f, [this, Feed, Points]
+	WhenDone([Feed] { return Feed->Updates > 0; }, 10.f, [this, Feed, Points]
 	{
 		BugHunt::Expect(BugHunt::Tr<Lab51Text::Updates>(), 1, Feed->Updates);
 		BugHunt::Expect(BugHunt::Tr<Lab51Text::AriaScore>(), Points, Feed->Scores.FindRef(TEXT("Aria")));
