@@ -25,6 +25,7 @@ private:
 class ABH_ScoreHud;
 
 // 점수를 관리하고, 점수판 HUD를 띄운다.
+// [JA] スコアを管理し、スコアボード HUD を表示する。
 UCLASS(NotPlaceable)
 class ABH_ScoreManager : public AActor
 {
@@ -47,6 +48,7 @@ private:
 };
 
 // 점수판을 화면에 그린다. 여기서는 마지막으로 표시한 글자를 기억하기만 한다.
+// [JA] スコアボードを画面に描く。ここでは最後に表示した文字列を覚えておくだけ。
 UCLASS(NotPlaceable)
 class ABH_ScoreHud : public AActor
 {

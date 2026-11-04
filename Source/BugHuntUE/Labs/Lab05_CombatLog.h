@@ -22,6 +22,8 @@ public:
 
 // 전투 기록 창. 열려 있는 동안 받은 피해를 한 줄씩 적는다.
 // 창 객체는 닫아도 지우지 않고 다시 연다 (UI 풀링).
+// [JA] 戦闘記録ウィンドウ。開いている間に受けたダメージを 1 行ずつ書く。
+// [JA] ウィンドウのオブジェクトは閉じても消さず、もう一度開く（UI プーリング）。
 UCLASS()
 class UBH_CombatLogPanel : public UObject
 {
@@ -35,6 +37,7 @@ public:
 	TArray<FString> Lines;
 
 	// 지금까지 화면에 띄운 알림 수 (통계용)
+	// [JA] これまで画面に出した通知の数（統計用）
 	UPROPERTY(VisibleAnywhere, Category = "BugHunt")
 	int32 NotificationsShown = 0;
 
