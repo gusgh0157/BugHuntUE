@@ -23,7 +23,10 @@ BUGHUNTUE_API void SetFixedFrameRate(float Fps);
 // 동기화가 없는 코드에서는 두 스레드가 반드시 겹치고, 잠금으로 보호된 코드에서는 다른 스레드가 잠금에 막혀
 // 이 줄에 오지 못하므로 시간 제한 뒤 혼자 지나간다(결과는 맞고 조금 느릴 뿐).
 // 이 줄을 지운다고 버그가 고쳐지지 않는다. 겹칠 확률이 낮아질 뿐이다.
-BUGHUNTUE_API void RaceWindow(int32 TimeoutMs = 200);
+// 짝이 시간 제한 안에 오지 않아 혼자 지나간 횟수는 RaceWindowMisses() 로 본다 (랩이 로그에 남긴다).
+// [JA] 相手が時間制限内に来ず 1 人で通過した回数は RaceWindowMisses() で見る（ラボがログに残す）。
+BUGHUNTUE_API void RaceWindow(int32 TimeoutMs = 2000);
+BUGHUNTUE_API int32 RaceWindowMisses();
 
 // ---------------------------------------------------------------------------
 // 배열 재할당 세기 (성능 랩)

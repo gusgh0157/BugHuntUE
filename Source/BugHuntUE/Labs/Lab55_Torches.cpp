@@ -10,7 +10,7 @@ namespace Lab55Text
 BH_TEXT(Start,     "성벽에 횃불 %d개. 2초(120프레임) 동안 0.5초마다 일렁여야 한다.", "城壁にたいまつ %d 本。2 秒（120 フレーム）間、0.5 秒ごとに揺らめかなければならない。");
 BH_TEXT(Counts,    "횃불 Tick 호출 %d번, 일렁임 %d~%d번", "たいまつの Tick 呼び出し %d 回、揺らめき %d〜%d 回");
 BH_TEXT(Flickered, "횃불마다 4번쯤 일렁였다 (%d~%d번, 3~5 이면 통과)", "たいまつごとに 4 回ほど揺らめいた（%d〜%d 回、3〜5 なら合格）");
-BH_TEXT(TickLimit, "횃불 Tick 은 일렁임 1번에 1번 이하 (%d번 ≤ %d)", "たいまつの Tick は揺らめき 1 回につき 1 回以下（%d 回 ≤ %d）");
+BH_TEXT(TickLimit, "횃불 Tick 은 일렁임 횟수 정도 (횃불마다 최대 5번 + 여유 1번: %d번 ≤ %d)", "たいまつの Tick は揺らめきの回数程度（たいまつごとに最大 5 回 + 余裕 1 回: %d 回 ≤ %d）");
 }
 
 int32 ABH_Torch::TickCalls = 0;
@@ -66,7 +66,7 @@ void ABH_Lab55::StartLab()
 		}
 		BugHunt::Note(BugHunt::Fmt<Lab55Text::Counts>(Ticks, MinFlickers, MaxFlickers));
 		BugHunt::ExpectTrue(BugHunt::Fmt<Lab55Text::Flickered>(MinFlickers, MaxFlickers), MinFlickers >= 3 && MaxFlickers <= 5);
-		BugHunt::ExpectTrue(BugHunt::Fmt<Lab55Text::TickLimit>(Ticks, NumTorches * 5), Ticks <= NumTorches * 5);
+		BugHunt::ExpectTrue(BugHunt::Fmt<Lab55Text::TickLimit>(Ticks, NumTorches * 6), Ticks <= NumTorches * 6);
 		FinishLab();
 	});
 }

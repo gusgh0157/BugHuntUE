@@ -33,8 +33,11 @@ void ABH_Tank::UpdateLaser()
 
 void ABH_Lab18::StartLab()
 {
-	const int32 X = BugHunt::CaseInt(2000, -4000, 4000);
-	const int32 Y = BugHunt::CaseInt(-1500, -4000, 4000);
+	// 원점 가까이(|X|,|Y| < 500)는 피한다. 거기서는 위치와 방향을 헷갈린 코드도 우연히 맞을 수 있다.
+	// [JA] 原点の近く（|X|,|Y| < 500）は避ける。そこでは位置と方向を取り違えたコードでも偶然合うことがある。
+	auto AwayFromOrigin = [](int32 V) { return FMath::Abs(V) < 500 ? (V < 0 ? -500 : 500) : V; };
+	const int32 X = AwayFromOrigin(BugHunt::CaseInt(2000, -4000, 4000));
+	const int32 Y = AwayFromOrigin(BugHunt::CaseInt(-1500, -4000, 4000));
 	const int32 Yaw = BugHunt::CaseInt(135, 20, 340);
 	const float Scale = static_cast<float>(BugHunt::CaseInt(15, 10, 20)) / 10.f;
 	BugHunt::Note(BugHunt::Fmt<Lab18Text::Scene>(Scale, X, Y, Yaw));

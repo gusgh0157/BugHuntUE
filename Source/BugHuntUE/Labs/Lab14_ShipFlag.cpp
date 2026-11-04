@@ -98,7 +98,7 @@ void ABH_Lab14::StartLab()
 #pragma region 힌트 3 / ヒント 3
 // 좌표계를 하나로 맞추세요. 배 기준 좌표를 그대로 Relative 에 넣거나, 월드 좌표를 SetWorldLocation 으로 넣습니다.
 //     Flag->SetRelativeLocation(MastTop);        // 또는 Flag->SetWorldLocation(Top);
-// 함수 이름의 Relative / World 와 넣는 값의 좌표계가 같은지 늘 확인하세요. 디테일 패널의 Location 옆 자물쇠 메뉴로
+// 함수 이름의 Relative / World 와 넣는 값의 좌표계가 같은지 늘 확인하세요. 디테일 패널의 Location 이름 옆 메뉴(▾)로
 // 상대(Relative)/월드(World) 표시를 바꿔 보면 같은 컴포넌트의 두 값을 비교할 수 있습니다.
 
 // [JA] 座標系を 1 つにそろえてください。船基準の座標をそのまま Relative に入れるか、ワールド座標を SetWorldLocation で入れます。

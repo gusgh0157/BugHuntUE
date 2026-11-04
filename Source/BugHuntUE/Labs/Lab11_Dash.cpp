@@ -79,10 +79,12 @@ void ABH_Lab11::StartLab()
 // ============================================================================
 
 #pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
-// 프레임레이트만 바꿨는데 거리가 바뀝니다. 직접 해 보세요: 콘솔 t.MaxFPS 30 → BugHunt.Lab 11, t.MaxFPS 120 → 다시. (끝나면 t.MaxFPS 0)
+// 프레임레이트만 바꿨는데 거리가 바뀝니다. 이 랩은 30fps 와 120fps 를 스스로 고정합니다(StartLab 의 SetFixedFrameRate 줄). 그래서 t.MaxFPS 를 바꿔도 출력은 같습니다.
+// t.MaxFPS 30 / 120 실험은 자기 프로젝트의 Tick 코드에서 해 보세요. (끝나면 t.MaxFPS 0)
 // ABH_Dasher::Tick 에 조건부 중단점(bDashing)을 걸고 DeltaSeconds 를 보세요. 30fps 와 120fps 에서 Tick 은 몇 번 불리나요?
 
-// [JA] フレームレートを変えただけなのに距離が変わります。自分で試してみてください: コンソールで t.MaxFPS 30 → BugHunt.Lab 11、t.MaxFPS 120 → もう一度。（終わったら t.MaxFPS 0）
+// [JA] フレームレートを変えただけなのに距離が変わります。このラボは 30fps と 120fps を自分で固定します（StartLab の SetFixedFrameRate の行）。そのため t.MaxFPS を変えても出力は同じです。
+// [JA] t.MaxFPS 30 / 120 の実験は自分のプロジェクトの Tick コードで試してください。（終わったら t.MaxFPS 0）
 // [JA] ABH_Dasher::Tick に条件付きブレークポイント（bDashing）を設定し、DeltaSeconds を見てください。30fps と 120fps で Tick は何回呼ばれますか？
 #pragma endregion
 
