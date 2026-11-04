@@ -23,10 +23,10 @@
 
 | 판 | 다루는 버그 | 저장소 |
 |---|---|---|
-| C++ 콘솔 | 호출 스택, 메모리 오류, 크래시 없는 흐름 추적 (랩 28개) | [BugHunt](https://github.com/gusgh0157/BugHunt) |
-| C# 콘솔 | 예외와 스택 트레이스, 흐름 추적, 비동기/동시성, 리소스와 메모리 (랩 28개) | [BugHuntCS](https://github.com/gusgh0157/BugHuntCS) |
-| 언리얼 엔진 | 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션 (랩 21개) | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
-| 유니티 | 크래시/예외, 흐름 추적, 사운드, 이미지, 애니메이션 (랩 23개) | [BugHuntUnity](https://github.com/gusgh0157/BugHuntUnity) |
+| C++ 콘솔 (표준 C++20, CMake) | 호출 스택, 흐름 추적, 연산자, 컨테이너, 언어 함정, 인터페이스와 상속, 파일 입출력, 직렬화, 포인터와 메모리, 비동기와 동시성, 멈춤, 성능 (랩 98개 + 챌린지 11개) | [BugHunt](https://github.com/gusgh0157/BugHunt) |
+| C# 콘솔 (.NET 10) | 예외, 흐름 추적, 컨테이너, 언어 함정, 인터페이스와 상속, 파일 입출력, 직렬화, 비동기와 동시성, 리소스와 메모리, unsafe, 멈춤, 성능 (랩 95개 + 챌린지 11개) | [BugHuntCS](https://github.com/gusgh0157/BugHuntCS) |
+| 언리얼 엔진 (UE 5.8) | 🚧 **공사중** — 크래시, 흐름 추적, 멀티플레이, 사운드, 이미지, 애니메이션 (공개된 master는 랩 21개). 컨테이너, 포인터와 수명, 물리, 프레임레이트, 트랜스폼, 멈춤, 성능, 채점기, 일본어판은 작업 브랜치에서 진행 중 | [BugHuntUE](https://github.com/gusgh0157/BugHuntUE) **(지금 보는 저장소)** |
+| 유니티 (Unity 6) | 크래시/예외, 흐름 추적(프레임레이트 포함), 컨테이너, 참조와 네이티브 메모리, 물리, 사운드, 이미지, 애니메이션, 멈춤, 성능, 데이터 레이스 (랩 55개, 트랜스폼 부 추가 중) | [BugHuntUnity](https://github.com/gusgh0157/BugHuntUnity) |
 
 ## 준비
 
