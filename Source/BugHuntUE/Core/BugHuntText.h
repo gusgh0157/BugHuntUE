@@ -17,12 +17,12 @@
 // 採点機のヘッドレス子プロセス（-nullrhi）でその準備が常に同じとは限りません。表はビルドに含まれるので、どこでも同じです。
 //
 // 쓰는 법 / 使い方 (랩마다 파일 위쪽에 표를 하나 둔다 / ラボごとにファイル上部に表を 1 つ置きます):
-//   namespace Lab18Text
+//   namespace Lab26Text
 //   {
 //   BH_TEXT(Placed, "칸 %d개를 밝혔다.", "%d マスを明らかにしました。");
 //   }
-//   BugHunt::Note(BugHunt::Fmt<Lab18Text::Placed>(Count));   // Printf 형식 / Printf 形式
-//   BugHunt::Note(BugHunt::Tr<Lab18Text::Placed>());          // 그대로 / そのまま
+//   BugHunt::Note(BugHunt::Fmt<Lab26Text::Placed>(Count));   // Printf 형식 / Printf 形式
+//   BugHunt::Note(BugHunt::Tr<Lab26Text::Placed>());          // 그대로 / そのまま
 // 일본어 칸이 비어 있으면 컴파일 오류가 난다 (번역 빠짐을 빌드에서 잡는다).
 // 日本語の欄が空だとコンパイルエラーになります（翻訳漏れをビルドで検出します）。
 namespace BugHunt

@@ -4,7 +4,7 @@ rem Output: a table on screen, grade-report.json in the project folder, per-lab 
 rem Builds first with build.bat, so close the editor before running.
 rem
 rem Usage: grade.bat                  all labs, hidden inputs (random seed)
-rem        grade.bat -labs=22-28      only some labs (e.g. -labs=1-4,22)
+rem        grade.bat -labs=30-36      only some labs (e.g. -labs=1-4,30)
 rem        grade.bat -seed=1234       fixed hidden-input seed
 rem        grade.bat -public          the public inputs from README instead of hidden ones
 rem        grade.bat -nobuild         skip the build step

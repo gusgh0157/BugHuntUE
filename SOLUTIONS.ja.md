@@ -256,9 +256,118 @@ UPROPERTY() int32 Deaths = 0;
 `Stats.AddZeroed_GetRef()` でもこの 1 か所は直りますが、ローカル変数 `FBH_RoundStats S;` や `FMemory::Malloc` で作った場所は相変わらずゴミです。
 **教訓:** 構造体とローカル変数は宣言する行で初期化します (UE のコーディング規約)。UObject の「自動 0」に頼らず、UObject のメンバーにも初期値を書きます。「is not initialized properly」の行は無視しません。ゴミ値のバグは Debug (0xCD のようなパターン)、Development、別の PC でそれぞれ違って見えるので、「自分の PC では動くんですが」の常連です。
 
-# 第3部: コンテナ
+# 第3部: トランスフォームと空間
 
-## ラボ 14 — 1 から数えるウェーブ番号をそのままインデックスに使う
+## ラボ 14 — SetRelativeLocation にワールド座標を入れた
+```
+間違った結果:     造船所 (原点) では旗がマストの先にあるのに、港では何千 cm も離れた場所にある
+止まった位置:     RaiseFlag の SetRelativeLocation の次の行。Top = 正しいワールド座標、Flag->GetRelativeLocation() = Top、
+               Flag->GetComponentLocation() = 船のトランスフォーム × Top (見当違いの場所)
+本当の原因:       Top はすでに船のトランスフォームを通したワールド座標。Relative は親基準なので、エンジンが船のトランスフォームをもう一度掛けた。
+               船が原点に回転なしで置かれていれば 2 回掛けても同じなので、造船所では表に出なかった。
+```
+**修正:**
+```cpp
+Flag->SetRelativeLocation(MastTop);        // 船基準の座標をそのまま。または Flag->SetWorldLocation(Top);
+```
+**教訓:** 位置を入れるたびに「この値はどの座標系か」を問います。関数名の Relative/World と値の座標系を合わせます。原点に回転なしで置いて行うテストは座標系のバグを隠すので、テスト用のアクターは原点から離れた場所に回して置きます。
+
+## ラボ 15 — 拾う装備を KeepWorldTransform で付けた
+```
+間違った結果:     剣が手から 2m 近く (公開入力では 186 cm) 離れた場所 (床にあった場所) に付いてついてくる。手と向きも違う
+止まった位置:     PickUp の AttachToComponent の次の行。Sword->GetRootComponent()->GetRelativeLocation() = 手を基準に見た「床にあった場所」
+本当の原因:       KeepWorldTransform は、付ける前のワールド トランスフォームを保つように相対トランスフォームを計算する。
+               付けた瞬間に剣が画面上で動かない代わりに、床にあった場所がそのまま手基準のオフセットになる。
+```
+**修正:**
+```cpp
+Sword->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+```
+**教訓:** ルールは位置・回転・スケールごとに別々に決まります。手に握るものは SnapToTarget (位置・回転を対象に合わせる) で、親のスケール (ここでは 1.25) に従ってはいけないものは NotIncludingScale。KeepRelative は「すでに相対値が正しく入っているとき」(コンストラクタで SetupAttachment した後など)、KeepWorld は「付けてもその場にいるべきとき」(走る車の上に落ちた物)。別のルールに変えても、剣の大きさのチェック (1.0) があるので IncludingScale は引っかかります。
+
+## ラボ 16 — ローカル回転をワールド回転の順序で掛けた
+```
+間違った結果:     ロールだけのときは正しい。傾いた後にピッチを入れると、機首がパイロットの頭上ではなく空 (ワールド +Z) のほうへ上がり、翼の軸が変わる
+止まった位置:     Steer。Delta * GetActorQuat() → 今の姿勢を作った後、Delta をワールド軸で適用
+本当の原因:       FQuat の A * B は B を先に、A を後に適用する。Delta * Current はワールド軸の回転、Current * Delta はローカル (機体) 軸の回転。
+               水平 (Current = 単位) からロールだけするときは 2 つの順序が同じで、前の軸を中心に回るロールは順序に関係なく同じに見えるので、ピッチで初めて表に出た。
+```
+**修正:**
+```cpp
+SetActorRotation(GetActorQuat() * Delta);   // または AddActorLocalRotation(Delta);
+```
+**教訓:** 入力が「パイロット/キャラクター基準」ならローカル回転 (`AddActorLocalRotation`、`Current * Delta`)、「世界基準」(風、重力の向きに合わせる) ならワールド回転 (`AddActorWorldRotation`、`Delta * Current`)。`FRotator` の Pitch/Yaw/Roll を足して積み重ねません。オイラー角は Yaw → Pitch → Roll の固定順なので、傾いた姿勢では足した分だけ回らず、ピッチ ±90° 付近では Yaw と Roll の軸が重なって (ジンバルロック) 値が飛びます。積み重ねはクォータニオンで。
+
+## ラボ 17 — FVector::ForwardVector はワールドの +X
+```
+間違った結果:     大砲は標的のほうを向いている (内積 1.000) のに、砲弾は常にワールド +X へ飛ぶ。標的が正面にあるときだけ当たる
+止まった位置:     Fire。Muzzle の計算は GetActorForwardVector()、Velocity は FVector::ForwardVector
+本当の原因:       FVector::ForwardVector は定数 (1, 0, 0)。アクターの回転とは関係がない。
+```
+**修正:**
+```cpp
+Ball->Velocity = GetActorForwardVector() * MuzzleSpeed;
+```
+**教訓:** `FVector::ForwardVector/RightVector/UpVector` はワールド軸の定数、`GetActorForwardVector()`/`Comp->GetForwardVector()` は回転を適用した軸です。同じ関数の中で 2 つが混ざっていたら疑います。`DrawDebugDirectionalArrow` で砲身の向きと速度を一緒に描けば一目でわかります。
+
+## ラボ 18 — 点と方向の変換関数を取り違えた
+```
+間違った結果:     レーザーの始点が、戦車がどこにいても原点の近く。方向は戦車が原点から遠いほどおかしい
+止まった位置:     UpdateLaser。LaserStart = TransformVector(MuzzleOffset) → 平行移動が抜ける、
+               LaserDir = TransformPosition(ForwardVector).GetSafeNormal() → 平行移動が方向に混ざる
+本当の原因:       TransformPosition = スケール・回転・平行移動 (点)、TransformVector = スケール・回転 (方向/変位)、TransformVectorNoScale = 回転のみ。
+               2 行が入れ替わっていた。原点・回転なし・スケール 1 なら 3 つとも同じ値なので表に出ない。
+```
+**修正:**
+```cpp
+LaserStart = ToWorld.TransformPosition(MuzzleOffset);
+LaserDir = ToWorld.TransformVectorNoScale(FVector::ForwardVector);
+```
+**教訓:** 点は Position、方向は Vector (長さがスケールに従うべきならそのまま、単位方向なら NoScale)。逆方向は `InverseTransformPosition`/`InverseTransformVector(NoScale)`。方向に平行移動が混ざると、「原点から離れるほど大きく間違う」という形で現れます。
+
+## ラボ 19 — ルートの非均一スケールが子の球コリジョンを縮めた
+```
+間違った結果:     警報半径 800 なのに 600 cm 先の侵入者に気づかない。ログ: 実際の半径 400 (SphereRadius 800)
+止まった位置:     Build の SetActorScale3D(0.5, 0.5, 高さ)。Alarm->GetScaledSphereRadius() = 800 × 0.5
+本当の原因:       ルートのスケールはすべての子に伝わる。球は非均一に伸ばせないので、エンジンは最も小さい軸のスケール (0.5) を使う。
+               塔の形を作るためのスケールが、警報範囲まで縮めた。
+```
+**修正:**
+```cpp
+Mesh->SetRelativeScale3D(FVector(0.5f, 0.5f, HeightScale));
+Mesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f * HeightScale));   // 底を Base に合わせる
+```
+**教訓:** 形のためのスケールは、形を持つコンポーネントにだけ与えます。ルートをスケール 1 のままにすれば、子 (コリジョン、音、付いたアクター) は影響を受けません。どうしてもルートを伸ばすなら、範囲用のコンポーネントに `SetUsingAbsoluteScale(true)`。カプセルは半径に X・Y の小さいほう、高さに Z を使い、ボックスは軸ごとに別々に伸びます。`show Collision` で実際の大きさを見ます。スケールを消すだけで塔を低くすると、塔の高さのチェックに引っかかります。
+
+## ラボ 20 — Mobility が Static のルートをゲーム中に動かした
+```
+間違った結果:     Tick は毎フレーム SetActorLocation を呼んでいるのに、足場が 0 cm しか動かなかった。クラッシュ・エラーなし
+止まった位置:     Tick の SetActorLocation → false を返す。メッセージログ (PIE): "Mobility of ... has to be 'Movable' if you'd like to move"
+本当の原因:       USceneComponent::CheckStaticMobilityAndWarn: Movable でないコンポーネントは、アクターの初期化後のゲームワールドで移動を拒み、警告だけを残す。
+               スポーン時の最初の位置は初期化前なので入り、「置かれはするが動かない」という形になった。
+```
+**修正:**
+```cpp
+Mesh->SetMobility(EComponentMobility::Movable);
+```
+**教訓:** 動くもの (扉、足場、エレベーター、投射物) は Movable。Static は事前に焼いたライティング・ナビゲーション用です。移動関数の bool の戻り値とメッセージログを確認する習慣をつけます。コンストラクタをコピーしてくるとき、Mobility のような「パフォーマンス用のデフォルト値」がついてこないか確認します (ラボ 34 の Generate Overlap Events と同じ形)。
+
+## ラボ 21 — 存在しないソケット名で付けた
+```
+間違った結果:     ランタンが足元 (メッシュの原点) にある。警告・エラーなし
+止まった位置:     HoldLantern。Mesh->DoesSocketExist(LanternSocket) = false ("RightHandSocket" はこのスケルトンにない)
+本当の原因:       存在しないソケット名だと、AttachToComponent と GetSocketTransform/GetSocketLocation は黙ってコンポーネント自体のトランスフォームを使う。
+               ほかのプロジェクトのキャラクターコードから持ってきたソケット名が、このメッシュにはなかった。
+```
+**修正:**
+```cpp
+FName LanternSocket = TEXT("hand_r");   // このスケルトンの右手のボーン。実際のゲームでは持ち手に合わせたソケットをソケットマネージャーで追加
+```
+**教訓:** ソケット・ボーン名はメッシュ (スケルトン) ごとに違います。コードに書いた名前は `ensure(Mesh->DoesSocketExist(Name))` で確認して、静かな失敗を大きな音に変えます。FName の比較なので大文字・小文字は関係ありませんが、つづりは合っていなければなりません。
+
+# 第4部: コンテナ
+
+## ラボ 22 — 1 から数えるウェーブ番号をそのままインデックスに使う
 ```
 間違った結果:     ウェーブ 4 の報酬まで受け取って Assertion failed: (Index >= 0) & (Index < ArrayNum)  [Array.h]
 止まった位置:     呼び出し履歴 (Call Stack) の Array.h の RangeCheck → 1 行上の ABH_WaveRewards::ClaimRewards。ウォッチ式 Wave = 5、Rewards.Num() = 5
@@ -271,7 +380,7 @@ Gold += Rewards[Wave - 1];     // または for (int32 i = 0; i < NumCleared; ++
 ```
 **教訓:** アンリアルの `TArray` は Development ビルドでも範囲をチェックします (`checkSlow` ではなく `RangeCheck`)。おかげで「たまにゴミ値」ではなく、その場で落ちます。assert が出たら、メッセージ中の式 (`Index < ArrayNum`) の 2 つの値をまずウォッチ式で見ます。「何番目」(1 から) と「インデックス」(0 から) が混ざる場所は、変数名で区別しておきます (`WaveNumber` / `WaveIndex`)。
 
-## ラボ 15 — 存在しないキーで TMap::operator[]
+## ラボ 23 — 存在しないキーで TMap::operator[]
 ```
 間違った結果:     KingsLetter を売るときに Assertion failed: Pair != nullptr  [Map.h.inl, FindChecked]
 止まった位置:     呼び出し履歴 FindChecked → operator[] → ABH_Shop::SellAll。ウォッチ式 Item = KingsLetter、Prices にそのキーなし
@@ -286,7 +395,7 @@ Total += *Found;
 なければ 0 でよい場合は `Prices.FindRef(Item)`、ないときに追加したければ `Prices.FindOrAdd(Item)`。
 **教訓:** キーが必ずあると **証明できるときだけ** `[]`/`FindChecked` を使います。データ (クエストアイテム、新しい DLC アイテム) が増えるとその証明が崩れます。`std::map` の癖 (`m[k]` で追加) はアンリアルでは正反対に動きます。
 
-## ラボ 16 — TMap::Find で受け取ったポインターを持ったまま新しいキーを追加
+## ラボ 24 — TMap::Find で受け取ったポインターを持ったまま新しいキーを追加
 ```
 間違った結果:     掲示板のオオカミ討伐数 期待 3、実際 2 (ログには "依頼対象 3 匹")
 止まった位置:     RecordHunt の ++(*TargetKills) にブレークポイント。Goblin が入る前後で TargetKills のアドレスと
@@ -302,9 +411,9 @@ for (const FName& Monster : Killed)
     ++Kills.FindOrAdd(Monster);       // 使うたびに探す
 }
 ```
-**教訓:** ラボ 23 の `TArray` 要素の参照と同じ規則が `TMap`/`TSet` にもあります。`Find`/`FindOrAdd`/`Add` がくれたポインター・参照は **次の追加や削除までしか** 信用しません。削除は Compact されるまで場所を空けておきますが、それも保証されたものではありません。あらかじめ持っておきたいなら、キーを覚えておいて探し直します (ハッシュ 1 回は安いです)。
+**教訓:** ラボ 31 の `TArray` 要素の参照と同じ規則が `TMap`/`TSet` にもあります。`Find`/`FindOrAdd`/`Add` がくれたポインター・参照は **次の追加や削除までしか** 信用しません。削除は Compact されるまで場所を空けておきますが、それも保証されたものではありません。あらかじめ持っておきたいなら、キーを覚えておいて探し直します (ハッシュ 1 回は安いです)。
 
-## ラボ 17 — 順序が重要な配列で RemoveAtSwap
+## ラボ 25 — 順序が重要な配列で RemoveAtSwap
 ```
 間違った結果:     行動順 期待 盗賊 → 騎士 → 魔法使い → 僧侶、実際 盗賊 → 僧侶 → 騎士 → 魔法使い
 止まった位置:     RemoveUnit の RemoveAtSwap の次の行。ウォッチ式で Order を展開すると最後の要素 (僧侶) が空いた場所 (1 番) に来ていた
@@ -317,7 +426,7 @@ Order.RemoveAt(Index);        // 後ろを 1 つずつ詰める。順序を維�
 ```
 **教訓:** `RemoveAtSwap` は順序に意味のない集まり (スポーンした弾のリストなど) にだけ使います。ソート済みの配列、ターン順、UI のリストに使うと、どこかで「たまに順序がおかしくなる」として現れます。名前に `Swap` が入った関数は、何と何を入れ替えるのか一度考えます。5 人の配列で O(n) はコストではありません。
 
-## ラボ 18 — operator== は座標だけ、GetTypeHash は Source まで見る
+## ラボ 26 — operator== は座標だけ、GetTypeHash は Source まで見る
 ```
 間違った結果:     判明したマス数 期待 7、実際 8 / 明かしたマス 8 つを問い合わせると「判明済み」は 2 つだけ (公開入力。いくつ合うかはハッシュ次第)
 止まった位置:     ウォッチ式で Revealed を展開すると (2,0) が Source だけ違う状態で 2 回入っている。
@@ -335,7 +444,7 @@ friend uint32 GetTypeHash(const FBH_CellKey& Key)
 さらに良い方法は、キーから Source を外して `TMap<FIntPoint, FString>` に変えることです (`FIntPoint` はハッシュと == がすでに一致しています)。
 **教訓:** ハッシュキーの構造体は `operator==` と `GetTypeHash` を **同じフィールドで、並べて** 書きます。キーのフィールドを入れた後で変えるのも同じバグです (古いハッシュのバケットに残ります)。変える必要があるなら、取り出してから入れ直します。検索が「たまに」失敗するならハッシュを疑います。
 
-## ラボ 19 — UPROPERTY のない TArray<UObject*>
+## ラボ 27 — UPROPERTY のない TArray<UObject*>
 ```
 間違った結果:     GC の後も生きている袋の中のアイテム 期待 3、実際 0 / 最近見たリストの有効なアイテム 期待 3、実際 0
 止まった位置:     CollectGarbage の後にブレークポイント。obj list class=BH_LootItem が GC 前 4 個、後 0 個。Bag->Items の要素はアドレスだけが残った
@@ -350,7 +459,7 @@ TArray<TObjectPtr<UBH_LootItem>> Items;
 ```
 **教訓:** ラボ 4 の規則はコンテナにもそのまま当てはまります。UObject を入れる `TArray`/`TMap`/`TSet` には `UPROPERTY()` を付けるか (UObject のメンバー)、`AddReferencedObjects`/`FGCObject` で知らせます (UObject ではないクラス)。つかんでおくつもりのないリストは `TWeakObjectPtr` で持ち、使うときに `IsValid`。要素の型は `TObjectPtr<>` で書くのが UE5 の規則です (エディタビルドでアクセスを追跡)。
 
-## ラボ 20 — FastArraySerializer の要素を変えて MarkItemDirty しない
+## ラボ 28 — FastArraySerializer の要素を変えて MarkItemDirty しない
 ```
 間違った結果:     [リッスンサーバー] 進行度 3, 5 PASS / [クライアント] 進行度 0, 0 FAIL (クエスト名 3 つはクライアントにある)
 止まった位置:     クライアントプロセスで GetProgress にブレークポイント。Quests.Items は 3 個、Progress はすべて 0。
@@ -365,9 +474,9 @@ Quests.MarkItemDirty(Entry);       // 要素を消したなら Quests.MarkArrayD
 ```
 **教訓:** 普通の `UPROPERTY(Replicated) TArray` はエンジンが毎回比較して勝手に送ってくれます (その代わり大きな配列だと高くつきます)。`FFastArraySerializer` は比較を省く代わりに、**変えた人がマークする責任** を負います。要素を変える関数を 1 か所に集めて (このラボの AddProgress)、そこでだけ `MarkItemDirty` すれば漏れません。クライアント側の反応は要素の `PostReplicatedAdd`/`PostReplicatedChange`/`PreReplicatedRemove` で受け取ります。
 
-# 第4部: ポインターと寿命
+# 第5部: ポインターと寿命
 
-## ラボ 21 — UObject ではない場所に raw ポインターでアクターを覚える
+## ラボ 29 — UObject ではない場所に raw ポインターでアクターを覚える
 ```
 間違った結果:     Bram のヘイト 60 FAIL (期待 10)。ボスが狙う対象 Bram FAIL (期待 Lia)
 止まった位置:     Kael->Destroy() の行でウォッチ式 Kael = 0x00000xxxxxxx をメモ → Bram のスポーン後、Bram のアドレスがまったく同じ
@@ -378,10 +487,10 @@ Quests.MarkItemDirty(Entry);       // 要素を消したなら Quests.MarkArrayD
 ```
 **修正:**
 ```cpp
-// Lab21_ThreatTable.h
+// Lab29_ThreatTable.h
 TMap<TWeakObjectPtr<AActor>, int32> Threat;
 
-// Lab21_ThreatTable.cpp — TopTarget
+// Lab29_ThreatTable.cpp — TopTarget
 for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair : Threat)
 {
     if (Pair.Key.IsValid() && Pair.Value > BestThreat)
@@ -394,7 +503,7 @@ for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair : Threat)
 `AddThreat`/`ThreatOf` はそのままでかまいません (`AActor*` が `TWeakObjectPtr` に変換されて探します)。死んだキーをときどき消したいなら、`Threat.Remove(nullptr)` ではなく `for (auto It = Threat.CreateIterator(); It; ++It) if (!It.Key().IsValid()) It.RemoveCurrent();`。
 **教訓:** ラボ 4 (UPROPERTY のないメンバー) は「GC が知らない参照なので **消される**」でしたが、このラボは「消されるのは正しいのに **消されたことを知らない**」です。UObject を UObject ではない場所 (普通の構造体、ラムダ、別スレッド、Slate ウィジェット、グローバルキャッシュ) で覚えておくなら `TWeakObjectPtr`。オブジェクトを生かしておく必要があるなら、`TStrongObjectPtr` か `FGCObject` (AddReferencedObjects) で GC に知らせます。raw ポインターの「アドレスが同じ」は「同じオブジェクト」ではありません。
 
-## ラボ 22 — タイマーのラムダが this をキャプチャしたがオブジェクトに結び付いていない
+## ラボ 30 — タイマーのラムダが this をキャプチャしたがオブジェクトに結び付いていない
 ```
 間違った結果:     標的に当たった回数 7 FAIL (期待 2)。"砲台破壊！" の後も発射 3, 4, 5... が出力される
 止まった位置:     Fire の条件付きブレークポイント (ShotsFired >= 3) → 呼び出し履歴 FTimerManager::Tick → ラムダ → Fire
@@ -411,7 +520,7 @@ GetWorldTimerManager().SetTimer(FireTimer, this, &ABH_Turret::Fire, InInterval, 
 補助手段: `EndPlay` で `GetWorldTimerManager().ClearTimer(FireTimer)`。
 **教訓:** デリゲート・タイマー・非同期コールバックに `[this]` を渡すときは、「このオブジェクトが先に消えたら?」を問います。`CreateLambda`/`AddLambda` + `[this]` は C++ のダングリングポインターとまったく同じです。今回は GC 前なので「撃つだけ」でしたが、GC が回った後ならラボ 4 のように解放済みメモリを読みます。アンリアルの答えは `CreateUObject`、`CreateWeakLambda`、`AddUObject`、`AddWeakLambda` (UObject)、`CreateSP`/`CreateSPLambda` (TSharedFromThis) です。
 
-## ラボ 23 — 配列要素の参照を持ったまま Add (再割り当て)
+## ラボ 31 — 配列要素の参照を持ったまま Add (再割り当て)
 ```
 記録表:          ポーション 4 (Gem の新しいスロット、4 スロット) → 3 → 2 (Herb の新しいスロット、5 スロット: インライン 4 スロットを超えてヒープへ引っ越し) → "1"
 間違った結果:     残りのポーション 2 FAIL (期待 1)。ログには 1 と出るが本物のスロットは 2
@@ -431,7 +540,7 @@ for (const FName& Drop : Drops)
 `Slots.Reserve(...)` であらかじめ領域を確保しても今回は通りますが、「何スロットあれば十分か」をコードが保証できないなら根本的な解決ではありません。
 **教訓:** `TArray` の `Add`、`Emplace`、`Insert`、`SetNum`、`Reserve`、`Append` は要素を移動させることがあります。その前に取り出した参照、ポインター、`GetData()` は無効です。デフォルトのアロケーターなら古い位置は **解放されたヒープ** なので、ときどき落ちたり他人のデータを壊したりし (-stomp2malloc で捕まります)、`TInlineAllocator` は古い位置が生きているので **落ちもせず値だけが消えます**。`TMap`/`TSet` の `FindOrAdd`/`Add` も同じです (`Find` で得たポインターは次の `Add` まで)。
 
-## ラボ 24 — TSharedPtr の循環参照
+## ラボ 32 — TSharedPtr の循環参照
 ```
 間違った結果:     会話が終わった後に残ったノード 7 FAIL (期待 0)。デストラクタのブレークポイントが一度も止まらない
 止まった位置:     EndConversation の Root.Reset() の直前にウォッチ式 Root → 参照カウント 4 (Root メンバー 1 つ + 選択肢 3 つの Parent。Current はすぐ前の行で Reset)
@@ -439,10 +548,10 @@ for (const FName& Drop : Drops)
 ```
 **修正:**
 ```cpp
-// Lab24_DialogueTree.h
+// Lab32_DialogueTree.h
 TWeakPtr<FBH_DialogueNode> Parent;
 
-// Lab24_DialogueTree.cpp — GoBack
+// Lab32_DialogueTree.cpp — GoBack
 if (TSharedPtr<FBH_DialogueNode> Up = Current ? Current->Parent.Pin() : nullptr)
 {
     Current = Up;
@@ -450,9 +559,9 @@ if (TSharedPtr<FBH_DialogueNode> Up = Current ? Current->Parent.Pin() : nullptr)
 ```
 **教訓:** `TSharedPtr` は参照カウントを数えるだけです。GC のように「誰も届かない輪」を見つけてはくれません。所有の方向 1 つだけを `TSharedPtr`/`TSharedRef` にし、逆向きに指す側 (親、所有者、リスナー) は `TWeakPtr`。クラッシュも警告もないので、`stat memory`、`memreport -full`、LLM (`-llm`) で「増え続ける数字」として見つかることがよくあります。このラボのように生成/破棄のカウンターを置けばすぐに見えます。
 
-# 第5部: 物理
+# 第6部: 物理
 
-## ラボ 25 — 速くて小さい物体のトンネリング (CCD 無効)
+## ラボ 33 — 速くて小さい物体のトンネリング (CCD 無効)
 ```
 間違った結果:     弾丸が鉄板に当たらなかった (Hit 0 回)、弾丸の X が鉄板の向こう側
 止まった位置:     Chaos Visual Debugger で録画してフレームを送ると、弾丸が鉄板の手前 → 鉄板の向こうへ一気に移る
@@ -465,7 +574,7 @@ Ball->SetUseCCD(true);    // 詳細パネル コリジョン → Use CCD
 ```
 **教訓:** 1 ステップで進む距離 (速度 × ステップ時間) が相手の物体の厚さより大きいとトンネリングします。速いものにだけ CCD を有効にします (高くつきます)。弾丸は普通、物理の代わりにライントレース (ヒットスキャン) やスイープで移動する `UProjectileMovementComponent` を使います。サブステップはステップを小さくするだけなので、この速度では足りません。
 
-## ラボ 26 — AStaticMeshActor はオーバーラップイベントの生成 (Generate Overlap Events) が無効
+## ラボ 34 — AStaticMeshActor はオーバーラップイベントの生成 (Generate Overlap Events) が無効
 ```
 間違った結果:     木箱は感圧板の中に置かれたのに押された回数 0、扉が開かない
 止まった位置:     PIE を一時停止 → 木箱の詳細パネル コリジョン (Collision): オーバーラップイベントの生成 (Generate Overlap Events) のチェックが外れた状態。
@@ -479,7 +588,7 @@ Mesh->SetGenerateOverlapEvents(true);   // ABH_WoodCrate のコンストラク�
 ```
 **教訓:** トリガーが呼ばれないときは、① チャンネルの応答 (両側)、② オーバーラップイベントの生成 (両側)、③ 本当に重なったか (`show Collision`) の順に見ます。両方 Block なら Overlap ではなく Hit が来ます (そして Hit は Simulation Generates Hit Events が有効でないと物理衝突からは来ません)。親クラスのコンストラクタが変えるデフォルト値を疑います (`AStaticMeshActor`、`ACharacter` のカプセルなど)。
 
-## ラボ 27 — SetActorLocation のデフォルトは瞬間移動 (bSweep=false)
+## ラボ 35 — SetActorLocation のデフォルトは瞬間移動 (bSweep=false)
 ```
 間違った結果:     大男の背面 X=540、城壁の前面 X=280
 止まった位置:     Knockback の SetActorLocation で F12 → bSweep = false がデフォルト値
@@ -492,7 +601,7 @@ SetActorLocation(Target, /*bSweep*/ true, &Hit);   // 城壁の前で止まる�
 ```
 **教訓:** ゲームプレイの移動 (ノックバック、ダッシュ、押し出し) はスイープで行います。瞬間移動が正しい場合 (リスポーン、テレポート) にだけ `bSweep=false`。スイープはルートコンポーネントの形状でしか行いません。キャラクターは `LaunchCharacter`/`CharacterMovement` が代わりにやってくれます。
 
-## ラボ 28 — 物理シミュレーション中の物体を位置で動かす
+## ラボ 36 — 物理シミュレーション中の物体を位置で動かす
 ```
 間違った結果:     放した直後の岩の速度 (0, 0, -635) (アームの速度 X 1000、Z 1000) → その場で落ちる
 止まった位置:     Tick にトレースポイント {Carried->Ball->GetPhysicsLinearVelocity()}: 持っている間 X は 0、Z は重力のせいでどんどん大きくなる負の数
@@ -510,9 +619,9 @@ void ABH_Catapult::Release()
 持っている間から物理で動かしたいなら、Tick で `SetPhysicsLinearVelocity((ArmTip - 現在位置) / DeltaSeconds)` か `UPhysicsHandleComponent`。
 **教訓:** シミュレーション中の物体は、位置ではなく速度、力、インパルスで動かします。Tick で位置を上書きすると、投げるときに速度が消え、他の物体とぶつかるときにガタガタ震えたり突き抜けたりします。どうしても位置で動かす必要があるなら、その間シミュレーションを切る (キネマティック) か、物理ハンドルを使います。
 
-# 第6部: サウンド
+# 第7部: サウンド
 
-## ラボ 29 — ソフト参照を撃つときに初めてロードする
+## ラボ 37 — ソフト参照を撃つときに初めてロードする
 ```
 間違った結果:     1 発目は 3 フレーム (約 13ms) 遅れ、2 発目は 0、3 発目 (GC の後) は再び 2 フレーム遅れ
 止まった位置:     Fire のブレークポイント → FireSound.Get() == nullptr → RequestAsyncLoad の経路。コールバックは数フレーム後の非同期ロードのティックで呼ばれる
@@ -523,14 +632,14 @@ void ABH_Catapult::Release()
 ```
 **修正:**
 ```cpp
-// Lab29_FireSound.h
+// Lab37_FireSound.h
 protected:
     virtual void BeginPlay() override;
 
     UPROPERTY()
     TObjectPtr<USoundBase> LoadedFireSound;     // 保持しておくハード参照
 
-// Lab29_FireSound.cpp
+// Lab37_FireSound.cpp
 void ABH_Blaster::BeginPlay()
 {
     Super::BeginPlay();
@@ -550,7 +659,7 @@ void ABH_Blaster::Fire()
 ゲーム中の停止 (ヒッチ) まで避けたいなら、`LoadSynchronous` の代わりに装備した時点で `RequestAsyncLoad` で前もってロードしておき、返された `TSharedPtr<FStreamableHandle>` をメンバーに保持します。ただし、この方法は **時間に頼る** 解決策です。装備してすぐ撃つとロードがまだ終わっておらず 1 発目が依然として遅れることがあるので、ロード完了前に撃ったら同期ロードに切り替える予備の経路 (上のコード) も一緒に置きます。このラボのテストは装備直後に撃つので、予備の経路がないと FAIL になることがあります。いっそ武器の `UPROPERTY` のハード参照に変えれば、武器と一緒にロードされます。
 **教訓:** 「1 回目だけ遅い」なら遅延ロードを真っ先に疑います。ソフト参照とは **ロードのタイミングと寿命を自分が責任を持つ** という意味です。撃つときに同期ロードすれば遅れはしませんがそのフレームが止まり (ヒッチ)、非同期ロードすれば止まりませんが遅れます。正解は「使う前に前もって、そして保持しておく」です。実際のプロジェクトでは Unreal Insights の Asset Loading トラックで「発射の瞬間にロードがあったか」を確認します。
 
-## ラボ 30 — アクターにアタッチした音がアクターと一緒に消える
+## ラボ 38 — アクターにアタッチした音がアクターと一緒に消える
 ```
 間違った結果:     0.1 秒後に爆発音が再生中ではない (爆発音の長さ 0.28 秒)
 止まった位置:     Explode の Destroy() の行 → ウォッチ式 Audio->GetOwner() == BH_ExplosiveBarrel_0 (ログのパスも ...BH_ExplosiveBarrel_0.AudioComponent_0)
@@ -565,7 +674,7 @@ Destroy();
 (一緒に動く必要がある音なら: アクターをすぐに消さず、非表示にしてコリジョンを切ってから `SetLifeSpan(音の長さ)`。)
 **教訓:** コンポーネントの寿命はアクターの寿命です。「消えるときに出す音・エフェクト」はアクターにアタッチしません。同じ原理で `SpawnEmitterAttached`/`SpawnSystemAttached` したパーティクルも途切れます。参考: エンジンは 1 秒以下の短い音を聞こえない位置で再生する場合、コンポーネントをそもそも作りません (`au.SoundDistanceOptimizationLength`)。このラボは結果がカメラの位置によって揺れないよう、その最適化を切ってテストします。
 
-## ラボ 31 — サーバーでだけ再生した音
+## ラボ 39 — サーバーでだけ再生した音
 ```
 間違った結果:     [リッスンサーバー] 3 回 PASS、[クライアント] 0 回 FAIL
 止まった位置:     PlayRingSound のブレークポイント → 常に GetNetMode() == NM_ListenServer。クライアントでは一度も止まらない
@@ -573,11 +682,11 @@ Destroy();
 ```
 **修正:**
 ```cpp
-// Lab31_AlarmBell.h
+// Lab39_AlarmBell.h
 UFUNCTION(NetMulticast, Unreliable)
 void Multicast_PlayRing();
 
-// Lab31_AlarmBell.cpp
+// Lab39_AlarmBell.cpp
 void ABH_AlarmBell::Ring()
 {
     check(HasAuthority());
@@ -589,11 +698,11 @@ void ABH_AlarmBell::Multicast_PlayRing_Implementation()
     PlayRingSound();
 }
 ```
-**教訓:** ラボ 38 と同じ根っこです。状態 (HP) はレプリケートされる変数で、**一回限りの演出** (音、エフェクト) は NetMulticast で送ります。演出は 1 つくらい抜けてもゲームが壊れないので、普通は `Unreliable` です。サーバーが専用サーバー (デディケイテッド) なら、サーバーの `PlaySound` は誰にも聞こえません。逆に「後から接続した人にも聞こえるべき」持続音 (警報が鳴り続けている最中) なら、Multicast ではなくレプリケートされる変数 (`bAlarmActive` + RepNotify) で状態を送る必要があります。
+**教訓:** ラボ 46 と同じ根っこです。状態 (HP) はレプリケートされる変数で、**一回限りの演出** (音、エフェクト) は NetMulticast で送ります。演出は 1 つくらい抜けてもゲームが壊れないので、普通は `Unreliable` です。サーバーが専用サーバー (デディケイテッド) なら、サーバーの `PlaySound` は誰にも聞こえません。逆に「後から接続した人にも聞こえるべき」持続音 (警報が鳴り続けている最中) なら、Multicast ではなくレプリケートされる変数 (`bAlarmActive` + RepNotify) で状態を送る必要があります。
 
-# 第7部: 画像 / レンダリング
+# 第8部: 画像 / レンダリング
 
-## ラボ 32 — 作った MID をメッシュに設定していない
+## ラボ 40 — 作った MID をメッシュに設定していない
 ```
 間違った結果:     左の木箱 (0.90, 0.90, 0.90) FAIL、マテリアル名が MID_... ではなく BasicShapeMaterial
 止まった位置:     SetHighlighted の SetVectorParameterValue の行 → ウォッチ式 MID と Mesh->GetMaterial(0) のアドレスが違う
@@ -610,7 +719,7 @@ void ABH_Crate::SetHighlighted(bool bOn)
 `Create` を使いたいなら `Mesh->SetMaterial(0, MID)` を付け加えれば済みます。ただしそうすると呼ぶたびに新しい MID ができるので、最初の 1 回だけ作ってメンバーに持っておく必要があります。
 **教訓:** 「値は変えたのに画面がそのまま」なら、まず **変えたオブジェクトと描画しているオブジェクトが同じか** を見ます。だからといって共有マテリアルのアセットを直接書き換えると、同じマテリアルを使う木箱が全部変わります (右の木箱のテストがそれを捕まえます)。木箱ごとに違う色 = 木箱ごとに MID。
 
-## ラボ 33 — 遅れて届いた非同期ロードのコールバックが再利用された枠を上書きする
+## ラボ 41 — 遅れて届いた非同期ロードのコールバックが再利用された枠を上書きする
 ```
 間違った結果:     枠の名前「回復ポーション」PASS、アイコン AICON-Red FAIL
 記録表:           フレーム 0 枠 ← ルビーの指輪 (アイコンなし → 非同期リクエスト)
@@ -639,7 +748,7 @@ PendingLoad = UAssetManager::GetStreamableManager().RequestAsyncLoad(...);
 (2) を使う場合も、**すぐに設定する経路 (ロード済みのアイコン) で前のリクエストをキャンセル** する必要があります。このラボで上書きする側は、まさにその経路の後に届きます。実際のプロジェクトでは名前よりもアイテム ID やリクエスト番号で比較します。
 **教訓:** 非同期コールバックは「リクエストしたときの世界」を覚えていて、「完了したときの世界」で実行されます。リストビュー・タイルビューのように **ウィジェットを再利用する** UI で最もよく起こります。この種のバグは順序が鍵なので、ログにフレーム番号を出して記録表を作ります。
 
-## ラボ 34 — sRGB の色を Linear 変換なしで /255
+## ラボ 42 — sRGB の色を Linear 変換なしで /255
 ```
 間違った結果:     #FF8000 → 画面 #FFBC00 (G 128 → 188 FAIL)、#008080 → #00BCBC (G・B FAIL)。0x00 と 0xFF は PASS
 止まった位置:     ToMaterialColor のブレークポイント → ウォッチ式 Color.G / 255.f = 0.502、FLinearColor(Color).G = 0.216
@@ -654,9 +763,9 @@ FLinearColor ToMaterialColor(const FColor& Color)
 ```
 **教訓:** 0 と 1 (0x00、0xFF) はガンマ変換してもそのままなので、純粋な赤・黒だけでテストするとこのバグは捕まりません。中間値 (0x80) を必ず入れます。「色あせて明るい」= Linear の場所に sRGB の値、「暗すぎて濃い」= その逆です。テクスチャなら同じ問題が sRGB チェックボックスとして現れます (色のテクスチャはオン、ノーマル・マスク・ラフネスはオフ)。エンジンの関数名: `FLinearColor(FColor)`/`FromSRGBColor` は変換、`FColor::ReinterpretAsLinear` は変換なし、`ToFColor(true)`/`ToFColorSRGB` は Linear → sRGB。
 
-# 第8部: アニメーション
+# 第9部: アニメーション
 
-## ラボ 35 — 描画されないとアニメーションが進まない
+## ラボ 43 — 描画されないとアニメーションが進まない
 ```
 間違った結果:     足音 0 回 FAIL (期待 4)。再生時間が過ぎたのに「モンタージュはまだ再生中: はい、位置 0.00 秒」
 止まった位置:     OnAnimEvent のブレークポイントで一度も止まらない → ウォッチ式 Walker->Mesh->ShouldTickPose() = false、bRecentlyRendered = false
@@ -671,7 +780,7 @@ Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickMo
 `AlwaysTickPose` でも通ります (最適化は弱くなります)。足音がアニムグラフのシーケンス (ロコモーション) から出ているなら、`OnlyTickMontagesWhenNotRendered` では足りず `AlwaysTickPose` 以上が必要です。
 **教訓:** 「画面外でだけ」「サーバーでだけ」「ヘッドレスでだけ」起きないアニメーションイベントは、まずこのオプションを見ます。専用サーバーは何も描画しないので、サーバーの攻撃判定の通知がまるごと消えます。スケルタルメッシュコンポーネントのデフォルト値は `AlwaysTickPoseAndRefreshBones`、`ACharacter` がコンストラクタでメッシュに設定する値は `AlwaysTickPose` (UE 5.8 `Character.cpp`) ですが、最適化の途中で変えた値が原因であることがよくあります。逆に、どうしても必要な判定は通知の代わりにサーバーのタイマーやゲームコードで回すのも一つの方法です。
 
-## ラボ 36 — interrupted で終わった前のモンタージュのイベントを「完了」として処理する
+## ラボ 44 — interrupted で終わった前のモンタージュのイベントを「完了」として処理する
 ```
 記録表:           フレーム 0    攻撃 → 振り始め
                    (0.3 秒)     攻撃 → 振り始め          ← 同じモンタージュを再び再生、前のインスタンスはブレンドアウト
@@ -696,7 +805,7 @@ void ABH_Swordsman::HandleMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 注意: これだけだと、**別のモンタージュ (回避、被弾) に押し出された** 場合にも `bAttacking` が true のまま残ります。実際のゲームなら、interrupted のときはコンボを上げず、`bAttacking` は「今もこのモンタージュが再生中か」(`!GetAnim()->Montage_IsPlaying(SwingMontage)`) で決めます。または `Montage_Play` の直後に `Montage_SetEndDelegate` で **今回のインスタンス専用** のデリゲートを設定します。
 **教訓:** モンタージュの終了イベントは「終わった」ではなく「消えた」です。連打・キャンセルのある攻撃では、前のインスタンスの終了イベントが **新しいインスタンスの再生中に** 届きます。ブレンドアウトの時間分だけ遅れて来るので、テストで見逃しやすいです。
 
-## ラボ 37 — オンとオフを 2 つの通知に分けて任せる
+## ラボ 45 — オンとオフを 2 つの通知に分けて任せる
 ```
 記録表:           0.55 秒 HitOn → ヒットボックスをオン
                    0.82 秒 被弾 → のけぞり、Montage_Stop(0.1)
@@ -707,11 +816,11 @@ void ABH_Swordsman::HandleMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 ```
 **修正 (検証済み): 区間を通知ステート 1 つに**
 ```cpp
-// Lab37_HitWindow.h
+// Lab45_HitWindow.h
 virtual void OnAnimStateBegin(FName EventName) override;
 virtual void OnAnimStateEnd(FName EventName) override;
 
-// Lab37_HitWindow.cpp — BeginPlay
+// Lab45_HitWindow.cpp — BeginPlay
 BugHunt::AddNotify(SlashMontage, Length * 0.3f, TEXT("HitWindow"), Length * 0.3f);   // [30%, 60%] のステート
 
 void ABH_Knight::OnAnimStateBegin(FName EventName) { bHitboxOn = true; }
@@ -721,9 +830,9 @@ void ABH_Knight::OnAnimStateEnd(FName EventName)   { bHitboxOn = false; }
 別の方法: `OnMontageBlendingOut`/`OnMontageEnded` でヒットボックスをオフにする安全装置 (このラボでは検証していません)。
 **教訓:** 「オンにして → オフにする」のように区間にまたがる状態を別々の時刻の 2 つのイベントに任せると、途中で途切れた瞬間にオフにする側が消えます。死亡、被弾、回避、ラグでフレームが大きく飛んだときに再現します。区間 = 通知ステート、そして状態をオンにするコードには常に「途切れたときにオフにする道」も一緒に作ります。
 
-# 第9部: マルチプレイ
+# 第10部: マルチプレイ
 
-## ラボ 38 — C++ の RepNotify はサーバーでは呼ばれない
+## ラボ 46 — C++ の RepNotify はサーバーでは呼ばれない
 ```
 間違った結果:     [リッスンサーバー] 画面の HP バー 100 (期待 55)。[クライアント] は PASS。スタンドアロンも FAIL。
 止まった位置:     OnRep_Health のブレークポイント → GetNetMode() が常に NM_Client。サーバーでは一度も止まらない。
@@ -740,7 +849,7 @@ void ABH_NetHero::ApplyDamage(int32 Damage)
 ```
 **教訓:** リッスンサーバーのホストはサーバーであると同時にプレイヤーです。C++ では、サーバーが値を変えた場所で OnRep を直接呼ぶパターンが一般的です。(ブループリントの RepNotify はサーバーでも自動的に呼ばれるので、BP から C++ に移すときによく起きるバグです。) プレイインエディタ (PIE) をリッスンサーバー + クライアントで実行し、`GetNetMode()` で誰が止まったかを確認する習慣をつけましょう。
 
-## ラボ 39 — クライアントでサーバーの状態を直接変える
+## ラボ 47 — クライアントでサーバーの状態を直接変える
 ```
 間違った結果:     [サーバー基準] リモートプレイヤーの宝箱が開いた FAIL、ゴールド 0。リモートクライアントのログには「自分の画面のゴールド: 100」
 止まった位置:     ABH_Chest::Open のブレークポイント → リモートプレイヤーの分は GetNetMode() == NM_Client、HasAuthority() == false
@@ -750,11 +859,11 @@ void ABH_NetHero::ApplyDamage(int32 Damage)
 ```
 **修正:**
 ```cpp
-// Lab39_Chest.h、ABH_PlayerController に追加
+// Lab47_Chest.h、ABH_PlayerController に追加
 UFUNCTION(Server, Reliable)
 void Server_OpenChest(ABH_Chest* Chest);
 
-// Lab39_Chest.cpp
+// Lab47_Chest.cpp
 void ABH_PlayerController::InteractWithChest(ABH_Chest* Chest)
 {
     if (!Chest)
@@ -785,9 +894,9 @@ void ABH_PlayerController::Server_OpenChest_Implementation(ABH_Chest* Chest)
 
 ---
 
-# 第10部: 並行処理とフリーズ (データ競合、無限ループ、デッドロック)
+# 第11部: 並行処理とフリーズ (データ競合、無限ループ、デッドロック)
 
-## ラボ 40 — 別のアクターの Tick が変えてくれる値をゲームスレッドで while で待つ
+## ラボ 48 — 別のアクターの Tick が変えてくれる値をゲームスレッドで while で待つ
 ```
 間違った結果:     応答なし (2000 ms) TIMEOUT。乗るときにエレベーターが来ていた FAIL、ゲームが止まった時間 2000 ms FAIL
 止まった位置:     HangBudgetSeconds 30 → すべて中断 (Break All) → スレッド ウィンドウ (Threads) で GameThread → RideElevator の while
@@ -805,7 +914,7 @@ void ABH_Passenger::RideElevator(ABH_Elevator* Elevator, float TargetHeight, flo
 タイマーで 0.05 秒ごとに `bArrived` を確認しても構いません。すでに到着している可能性があるなら `if (Elevator->bArrived) Board(Elevator); else AddUObject(...)`。
 **教訓:** ゲームスレッドのコードでは「待つ」コードを書きません。待つべきことは、潜在アクション (`FPendingLatentAction`、ブループリントのディレイ (Delay) ノード)、タイマー、デリゲート、Tick、`UE::Tasks` で「後で呼んでほしい」に変えます。`Sleep` を入れても CPU 使用率が減るだけで、固まるのは同じです。
 
-## ラボ 41 — 幅優先探索の訪問記録がループ 1 周分しか生きていない
+## ラボ 49 — 幅優先探索の訪問記録がループ 1 周分しか生きていない
 ```
 間違った結果:     城門 → 港 PASS、城門 → 灯台 応答なし TIMEOUT (226,000 周以上回った)
 止まった位置:     HangBudgetSeconds 30 → すべて中断 → FindPath。ウォッチ式 Frontier.Num() が数十万、Visited.Num() は 1〜4
@@ -829,7 +938,7 @@ while (Frontier.Num() > 0)
 `CameFrom.Contains(Next)` で調べても構いません (CameFrom がそのまま訪問リストです)。
 **教訓:** グラフ探索が固まるのは、ほぼ常に「行けない目的地 + 訪問チェックのミス」です。テストには **到達できない目的地** を必ず入れます。ローカル変数がどの中括弧の中で作られるか (寿命) も一緒に見ます。実際のゲームでは探索ノード数に上限を設け (Unreal のナビメッシュの `MaxSearchNodes` のように)、超えたら「経路なし」で終えるのが普通です。
 
-## ラボ 42 — ロックなしの読み取り・計算・書き込み (lost update)
+## ラボ 50 — ロックなしの読み取り・計算・書き込み (lost update)
 ```
 間違った結果:     金庫のゴールド 期待 1000、実際 500 (公開入力: 100+200+300+400。どの 2 つが重なるかによって 500〜700)
 止まった位置:     Gold = Before + Amount の行にブレークポイント → 並列スタック (Parallel Stacks): 2 つのスレッドが同じ行に止まっていて、どちらも Before = 0
@@ -854,7 +963,7 @@ struct FBH_GuildVault
 数値 1 つなら `std::atomic<int32> Gold; Gold.fetch_add(Amount);` でも構いません。
 **教訓:** 複数のスレッドが同じデータを書き換えるなら、読み取りから書き込みまでをひとかたまりとして保護します。いちばん良いのは共有しないことです: タスクごとに自分の枠 (`Results[Index]`) に書き、終わった後に 1 つのスレッドでまとめます。競合は「たまに」起きるので、テストが通ったことは証拠になりません。疑わしいときはわざと隙間を広げて (`Sleep`、このラボの RaceWindow) 再現します。
 
-## ラボ 43 — ワーカースレッドでゲームスレッド専用のオブジェクトに触れる
+## ラボ 51 — ワーカースレッドでゲームスレッド専用のオブジェクトに触れる
 ```
 間違った結果:     Assertion failed: IsInGameThread()  (CRASH)
 止まった位置:     呼び出し履歴 (Call Stack) のいちばん上は ABH_ScoreFeed::AddScore、いちばん下は Async が立ち上げたスレッドの実行関数。スレッド ウィンドウの現在のスレッドは GameThread ではない
@@ -873,7 +982,7 @@ Async(EAsyncExecution::Thread, [WeakFeed, Points]
 ```
 **教訓:** UObject/アクター/コンポーネント/ワールドはゲームスレッドでだけ。ワーカースレッドには計算に必要な値だけをコピーして渡し、結果は `AsyncTask(GameThread)` (または `UE::Tasks` の後続タスク、`FTSTicker`) で戻します。`TWeakObjectPtr::Get()` もゲームスレッドで呼びます。自分で作ったゲームスレッド専用の関数にも `check(IsInGameThread())` を入れておけば、この種のミスがその場で捕まります。
 
-## ラボ 44 — ゲームスレッドがワーカースレッドの結果を同期で待ち、ワーカースレッドはゲームスレッドを待つ
+## ラボ 52 — ゲームスレッドがワーカースレッドの結果を同期で待ち、ワーカースレッドはゲームスレッドを待つ
 ```
 間違った結果:     応答なし (2000 ms 待機、デッドロックの疑い) TIMEOUT。ゲームが止まった時間 2000 ms、保存完了 FAIL
 止まった位置:     HangBudgetSeconds 30 → すべて中断 → 並列スタック:
@@ -905,9 +1014,9 @@ void ABH_SaveSystem::AutoSave(ABH_SaveHero* Hero)
 スナップショットだけ先に取って `Done.Get()` を残すと、デッドロックは解けますが「ゲームが止まった時間 < 50 ms」が FAIL です (ディスク書き込みの 0.3 秒分のヒッチ)。ワーカースレッドで `Hero->Gold` を直接読むとデータ競合になり、保存直後の +50 が混ざって「保存内容」が FAIL になることがあります。
 **教訓:** ゲームスレッドで `Future.Get()`、`Event->Wait()`、`FScopeLock` で長く待ちません。特に、待つ相手がゲームスレッドに仕事を送る構造 (ロード、セーブ、アセットストリーミングのコールバック) なら、そのままデッドロックです。2 つのロックを互いに逆の順序で取るデッドロック (A→B / B→A) も、並列スタックでは同じ形に見えます: 2 つのスレッドがお互いに相手の握っているものを待っています。
 
-# 第11部: パフォーマンス
+# 第12部: パフォーマンス
 
-## ラボ 45 — Tick のたびにワールド全体を検索
+## ラボ 53 — Tick のたびにワールド全体を検索
 ```
 間違った結果:     1 秒間にアクター全体の検索 12,000 回 (アイコン 200 個 × 60 フレーム)
 止まった位置:     stat game で Tick の時間が大きい。Insights の長いフレームの中に ABH_MapMarker::Tick → GetAllActorsOfClass が 200 回
@@ -921,7 +1030,7 @@ void ABH_MapMarker::Tick(float DeltaSeconds) { ...; if (const ABH_MapHero* Found
 ```
 **教訓:** Tick の中の `GetAllActorsOfClass`、`FindComponentByClass`、`TActorIterator` は、ほぼ常に BeginPlay に移せます。対象が変わりうるなら弱いポインタで覚えておき、変わる瞬間 (スポーン、破棄) に通知を受け取ります。
 
-## ラボ 46 — 毎フレーム、ローカルの TArray を伸ばしながら埋める
+## ラボ 54 — 毎フレーム、ローカルの TArray を伸ばしながら埋める
 ```
 間違った結果:     60 フレームの間に配列のメモリ確保 240 回 (1 フレームあたり 4 回、点 64 個のとき)
 止まった位置:     Points.Add に条件付きブレークポイント Points.Num() == Points.Max(): 1 フレームに何度も、Max が段階的に増える
@@ -935,7 +1044,7 @@ Points.Reserve(NumPoints);       // 1 フレームあたり 1 回
 ```
 **教訓:** 個数がわかるなら `Reserve`。毎フレーム使う配列はメンバーにして `Reset` (メモリは保持)、小さくて個数が決まっているなら `TInlineAllocator`。文字列も同じです: 毎フレーム `FString::Printf` で UI の文字列を作ると、フレームごとに確保が起きます。値が変わったときだけ作ります。
 
-## ラボ 47 — 何もすることのない Tick が数百個
+## ラボ 55 — 何もすることのない Tick が数百個
 ```
 間違った結果:     2 秒間にたいまつの Tick 36,900 回 (300 個 × 約 123 フレーム)、実際に揺らめいたのは 1,200 回
 止まった位置:     dumpticks に BH_Torch のティック関数が 300 個。stat game の Tick Time がたいまつの数に比例
@@ -948,7 +1057,7 @@ PrimaryActorTick.TickInterval = 0.5f;          // 方法 1: その周期でだ�
 ```
 **教訓:** アクターの Tick はデフォルトでオフにしておき、必要なときだけオンにします (`SetActorTickEnabled`)。周期的な仕事はタイマーか `TickInterval`。数千個ならマネージャー 1 つが配列を回し、遠くにあるものは Significance Manager で頻度を下げます。
 
-## ラボ 48 — ゲーム中の同期ロード
+## ラボ 56 — ゲーム中の同期ロード
 ```
 間違った結果:     扉を開けた瞬間に同期ロード 1 回 (/Engine/BasicShapes/Cone)、そのフレームが数 ms〜数百 ms 止まる
 止まった位置:     -trace=cpu,loadtime → Insights の Timing: そのフレームに LoadPackage。Asset Loading Insights に Cone
@@ -964,113 +1073,4 @@ void ABH_BossArena::BeginPlay()
 }
 UStaticMesh* Mesh = BossMesh.Get();                         // SpawnBoss: すでに届いている
 ```
-**教訓:** ソフト参照とは「いつロードするかを自分で決める」という意味です。使う直前ではなく前もって (部屋に入るとき、ロード画面で) 非同期でロードし、ハンドルを持っておいて GC に片付けられないようにします。`LoadObject`/`LoadSynchronous`/`StaticLoadObject` をゲームプレイのコードで見かけたら疑います。ラボ 29 の発射音は逆に「非同期で遅すぎた」ケースです。
-
-# 第12部: トランスフォームと空間
-
-## ラボ 49 — SetRelativeLocation にワールド座標を入れた
-```
-間違った結果:     造船所 (原点) では旗がマストの先にあるのに、港では何千 cm も離れた場所にある
-止まった位置:     RaiseFlag の SetRelativeLocation の次の行。Top = 正しいワールド座標、Flag->GetRelativeLocation() = Top、
-               Flag->GetComponentLocation() = 船のトランスフォーム × Top (見当違いの場所)
-本当の原因:       Top はすでに船のトランスフォームを通したワールド座標。Relative は親基準なので、エンジンが船のトランスフォームをもう一度掛けた。
-               船が原点に回転なしで置かれていれば 2 回掛けても同じなので、造船所では表に出なかった。
-```
-**修正:**
-```cpp
-Flag->SetRelativeLocation(MastTop);        // 船基準の座標をそのまま。または Flag->SetWorldLocation(Top);
-```
-**教訓:** 位置を入れるたびに「この値はどの座標系か」を問います。関数名の Relative/World と値の座標系を合わせます。原点に回転なしで置いて行うテストは座標系のバグを隠すので、テスト用のアクターは原点から離れた場所に回して置きます。
-
-## ラボ 50 — 拾う装備を KeepWorldTransform で付けた
-```
-間違った結果:     剣が手から 2m 近く (公開入力では 186 cm) 離れた場所 (床にあった場所) に付いてついてくる。手と向きも違う
-止まった位置:     PickUp の AttachToComponent の次の行。Sword->GetRootComponent()->GetRelativeLocation() = 手を基準に見た「床にあった場所」
-本当の原因:       KeepWorldTransform は、付ける前のワールド トランスフォームを保つように相対トランスフォームを計算する。
-               付けた瞬間に剣が画面上で動かない代わりに、床にあった場所がそのまま手基準のオフセットになる。
-```
-**修正:**
-```cpp
-Sword->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
-```
-**教訓:** ルールは位置・回転・スケールごとに別々に決まります。手に握るものは SnapToTarget (位置・回転を対象に合わせる) で、親のスケール (ここでは 1.25) に従ってはいけないものは NotIncludingScale。KeepRelative は「すでに相対値が正しく入っているとき」(コンストラクタで SetupAttachment した後など)、KeepWorld は「付けてもその場にいるべきとき」(走る車の上に落ちた物)。別のルールに変えても、剣の大きさのチェック (1.0) があるので IncludingScale は引っかかります。
-
-## ラボ 51 — ローカル回転をワールド回転の順序で掛けた
-```
-間違った結果:     ロールだけのときは正しい。傾いた後にピッチを入れると、機首がパイロットの頭上ではなく空 (ワールド +Z) のほうへ上がり、翼の軸が変わる
-止まった位置:     Steer。Delta * GetActorQuat() → 今の姿勢を作った後、Delta をワールド軸で適用
-本当の原因:       FQuat の A * B は B を先に、A を後に適用する。Delta * Current はワールド軸の回転、Current * Delta はローカル (機体) 軸の回転。
-               水平 (Current = 単位) からロールだけするときは 2 つの順序が同じで、前の軸を中心に回るロールは順序に関係なく同じに見えるので、ピッチで初めて表に出た。
-```
-**修正:**
-```cpp
-SetActorRotation(GetActorQuat() * Delta);   // または AddActorLocalRotation(Delta);
-```
-**教訓:** 入力が「パイロット/キャラクター基準」ならローカル回転 (`AddActorLocalRotation`、`Current * Delta`)、「世界基準」(風、重力の向きに合わせる) ならワールド回転 (`AddActorWorldRotation`、`Delta * Current`)。`FRotator` の Pitch/Yaw/Roll を足して積み重ねません。オイラー角は Yaw → Pitch → Roll の固定順なので、傾いた姿勢では足した分だけ回らず、ピッチ ±90° 付近では Yaw と Roll の軸が重なって (ジンバルロック) 値が飛びます。積み重ねはクォータニオンで。
-
-## ラボ 52 — FVector::ForwardVector はワールドの +X
-```
-間違った結果:     大砲は標的のほうを向いている (内積 1.000) のに、砲弾は常にワールド +X へ飛ぶ。標的が正面にあるときだけ当たる
-止まった位置:     Fire。Muzzle の計算は GetActorForwardVector()、Velocity は FVector::ForwardVector
-本当の原因:       FVector::ForwardVector は定数 (1, 0, 0)。アクターの回転とは関係がない。
-```
-**修正:**
-```cpp
-Ball->Velocity = GetActorForwardVector() * MuzzleSpeed;
-```
-**教訓:** `FVector::ForwardVector/RightVector/UpVector` はワールド軸の定数、`GetActorForwardVector()`/`Comp->GetForwardVector()` は回転を適用した軸です。同じ関数の中で 2 つが混ざっていたら疑います。`DrawDebugDirectionalArrow` で砲身の向きと速度を一緒に描けば一目でわかります。
-
-## ラボ 53 — 点と方向の変換関数を取り違えた
-```
-間違った結果:     レーザーの始点が、戦車がどこにいても原点の近く。方向は戦車が原点から遠いほどおかしい
-止まった位置:     UpdateLaser。LaserStart = TransformVector(MuzzleOffset) → 平行移動が抜ける、
-               LaserDir = TransformPosition(ForwardVector).GetSafeNormal() → 平行移動が方向に混ざる
-本当の原因:       TransformPosition = スケール・回転・平行移動 (点)、TransformVector = スケール・回転 (方向/変位)、TransformVectorNoScale = 回転のみ。
-               2 行が入れ替わっていた。原点・回転なし・スケール 1 なら 3 つとも同じ値なので表に出ない。
-```
-**修正:**
-```cpp
-LaserStart = ToWorld.TransformPosition(MuzzleOffset);
-LaserDir = ToWorld.TransformVectorNoScale(FVector::ForwardVector);
-```
-**教訓:** 点は Position、方向は Vector (長さがスケールに従うべきならそのまま、単位方向なら NoScale)。逆方向は `InverseTransformPosition`/`InverseTransformVector(NoScale)`。方向に平行移動が混ざると、「原点から離れるほど大きく間違う」という形で現れます。
-
-## ラボ 54 — ルートの非均一スケールが子の球コリジョンを縮めた
-```
-間違った結果:     警報半径 800 なのに 600 cm 先の侵入者に気づかない。ログ: 実際の半径 400 (SphereRadius 800)
-止まった位置:     Build の SetActorScale3D(0.5, 0.5, 高さ)。Alarm->GetScaledSphereRadius() = 800 × 0.5
-本当の原因:       ルートのスケールはすべての子に伝わる。球は非均一に伸ばせないので、エンジンは最も小さい軸のスケール (0.5) を使う。
-               塔の形を作るためのスケールが、警報範囲まで縮めた。
-```
-**修正:**
-```cpp
-Mesh->SetRelativeScale3D(FVector(0.5f, 0.5f, HeightScale));
-Mesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f * HeightScale));   // 底を Base に合わせる
-```
-**教訓:** 形のためのスケールは、形を持つコンポーネントにだけ与えます。ルートをスケール 1 のままにすれば、子 (コリジョン、音、付いたアクター) は影響を受けません。どうしてもルートを伸ばすなら、範囲用のコンポーネントに `SetUsingAbsoluteScale(true)`。カプセルは半径に X・Y の小さいほう、高さに Z を使い、ボックスは軸ごとに別々に伸びます。`show Collision` で実際の大きさを見ます。スケールを消すだけで塔を低くすると、塔の高さのチェックに引っかかります。
-
-## ラボ 55 — Mobility が Static のルートをゲーム中に動かした
-```
-間違った結果:     Tick は毎フレーム SetActorLocation を呼んでいるのに、足場が 0 cm しか動かなかった。クラッシュ・エラーなし
-止まった位置:     Tick の SetActorLocation → false を返す。メッセージログ (PIE): "Mobility of ... has to be 'Movable' if you'd like to move"
-本当の原因:       USceneComponent::CheckStaticMobilityAndWarn: Movable でないコンポーネントは、アクターの初期化後のゲームワールドで移動を拒み、警告だけを残す。
-               スポーン時の最初の位置は初期化前なので入り、「置かれはするが動かない」という形になった。
-```
-**修正:**
-```cpp
-Mesh->SetMobility(EComponentMobility::Movable);
-```
-**教訓:** 動くもの (扉、足場、エレベーター、投射物) は Movable。Static は事前に焼いたライティング・ナビゲーション用です。移動関数の bool の戻り値とメッセージログを確認する習慣をつけます。コンストラクタをコピーしてくるとき、Mobility のような「パフォーマンス用のデフォルト値」がついてこないか確認します (ラボ 26 の Generate Overlap Events と同じ形)。
-
-## ラボ 56 — 存在しないソケット名で付けた
-```
-間違った結果:     ランタンが足元 (メッシュの原点) にある。警告・エラーなし
-止まった位置:     HoldLantern。Mesh->DoesSocketExist(LanternSocket) = false ("RightHandSocket" はこのスケルトンにない)
-本当の原因:       存在しないソケット名だと、AttachToComponent と GetSocketTransform/GetSocketLocation は黙ってコンポーネント自体のトランスフォームを使う。
-               ほかのプロジェクトのキャラクターコードから持ってきたソケット名が、このメッシュにはなかった。
-```
-**修正:**
-```cpp
-FName LanternSocket = TEXT("hand_r");   // このスケルトンの右手のボーン。実際のゲームでは持ち手に合わせたソケットをソケットマネージャーで追加
-```
-**教訓:** ソケット・ボーン名はメッシュ (スケルトン) ごとに違います。コードに書いた名前は `ensure(Mesh->DoesSocketExist(Name))` で確認して、静かな失敗を大きな音に変えます。FName の比較なので大文字・小文字は関係ありませんが、つづりは合っていなければなりません。
+**教訓:** ソフト参照とは「いつロードするかを自分で決める」という意味です。使う直前ではなく前もって (部屋に入るとき、ロード画面で) 非同期でロードし、ハンドルを持っておいて GC に片付けられないようにします。`LoadObject`/`LoadSynchronous`/`StaticLoadObject` をゲームプレイのコードで見かけたら疑います。ラボ 37 の発射音は逆に「非同期で遅すぎた」ケースです。

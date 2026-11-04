@@ -238,7 +238,7 @@ FLabResult GradeLab(const BugHunt::FLabInfo& Lab, const FGradeOptions& Options)
 	}
 	else
 	{
-		// 멀티플레이 랩(랩 20, 31, 38, 39): 리슨 서버 프로세스가 랩을 돌리고, 클라이언트 프로세스가 접속한다.
+		// 멀티플레이 랩(랩 28, 39, 46, 47): 리슨 서버 프로세스가 랩을 돌리고, 클라이언트 프로세스가 접속한다.
 		FString Map = TEXT("/Engine/Maps/Templates/Template_Default");
 		GConfig->GetString(TEXT("/Script/EngineSettings.GameMapsSettings"), TEXT("GameDefaultMap"), Map, GEngineIni);
 		const int32 Port = 17700 + Lab.Number;
