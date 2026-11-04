@@ -3,7 +3,7 @@
 [BugHunt](https://github.com/gusgh0157/BugHunt)(C++ 콘솔판)의 언리얼 엔진 버전입니다.
 버그가 **일부러 심어진** 작은 게임 코드 모음이고, 이번에는 **언리얼에서만 생기는** 버그들입니다.
 
-> **UE6 안내 (2026년 11월 기준):** Epic은 UE6에서 게임플레이 프레임워크(Actor, Blueprint, C++ 게임플레이 코드)를 **Verse와 Scene Graph 기반의 새 프레임워크**로 바꾸고, 기존 프레임워크는 새것이 충분히 성숙하면 단계적으로 폐기하며 변환 도구를 제공할 계획이라고 밝혔습니다([Unreal Fest Tokyo 2026-11-03 발표](https://www.invenglobal.com/articles/28098/epic-games-will-remove-blueprints-and-actors-from-unreal-engine-6), [Epic 로드맵 "The road to UE6"](https://www.unrealengine.com/news/the-road-to-ue-6)). UE6 얼리 액세스는 2027년 말 예정이고, C++는 렌더링·물리 같은 엔진 하층에 남습니다.
+> **UE6 안내 (2026년 11월 기준):** Epic은 UE6에서 **Actor, Blueprint, 그리고 C++로 쓰인 게임플레이 프레임워크를 폐지**하고, 게임플레이를 **Verse**와 **Scene Graph**(Entity + Component) 기반의 새 프레임워크로 옮긴다고 밝혔습니다. 당초 로드맵은 "비추천 뒤 단계적 폐지"였지만, Unreal Fest Tokyo 2026(11월 3일) 기조 강연에서 Tim Sweeney가 **UE6 얼리 액세스(2027년 말 예정)부터 전면 폐지**로 바뀌었다고 발표했고, AI 변환 지원 도구를 제공할 예정입니다. C++는 렌더링·물리 같은 엔진 하층에 남습니다. 출처: [Gamemakers.jp 기조 강연 보도](https://gamemakers.jp/article/2026_11_03_149187/), [Epic 로드맵 "The road to UE6"](https://www.unrealengine.com/news/the-road-to-ue-6).
 > 이 저장소는 **UE 5.8의 C++ 게임플레이 프레임워크** 기준입니다. 여기서 익히는 것(엔진 프레임이 섞인 호출 스택 읽기, GC와 `UPROPERTY`, 복제와 권한, Tick 순서, 비동기 로드, 디버거 도구)은 UE6에서도 엔진 쪽 C++ 디버깅에 그대로 쓰이지만, Actor/Blueprint 기반의 랩 코드 자체는 UE6의 새 프레임워크로 옮겨 써야 할 수 있습니다.
 
 - **1부: 크래시 추적 (랩 1~4)**: 에디터나 게임이 죽거나 `Ensure`가 뜬 순간, 호출 스택을 거슬러 올라가 원인을 찾습니다. 엔진 프레임이 섞인 긴 스택을 읽는 연습입니다.
