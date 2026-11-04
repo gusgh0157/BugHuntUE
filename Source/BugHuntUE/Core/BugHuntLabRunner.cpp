@@ -68,6 +68,14 @@
 #include "Labs/Lab46_AimPreview.h"
 #include "Labs/Lab47_Torches.h"
 #include "Labs/Lab48_BossEntrance.h"
+#include "Labs/Lab49_ShipFlag.h"
+#include "Labs/Lab50_PickupSword.h"
+#include "Labs/Lab51_Glider.h"
+#include "Labs/Lab52_Cannon.h"
+#include "Labs/Lab53_LaserSight.h"
+#include "Labs/Lab54_WatchTower.h"
+#include "Labs/Lab55_MovingPlatform.h"
+#include "Labs/Lab56_Lantern.h"
 
 namespace RunnerText
 {
@@ -149,11 +157,20 @@ const FLabEntry GLabs[] = {
 	{ TEXT("조준선"), TEXT("照準線"),         TEXT("조준하는 동안 메모리 할당이 잦다"), TEXT("エイム中にメモリ確保が多い"),              [] { return ABH_Lab46::StaticClass(); } },
 	{ TEXT("횃불"), TEXT("たいまつ"),           TEXT("횃불이 많으면 게임이 느려진다"), TEXT("たいまつが多いとゲームが重くなる"),                  [] { return ABH_Lab47::StaticClass(); } },
 	{ TEXT("보스 등장"), TEXT("ボス登場"),      TEXT("보스가 나올 때 화면이 멈칫한다"), TEXT("ボスが出る瞬間に画面がカクつく"),                  [] { return ABH_Lab48::StaticClass(); } },
+	// 12부: 트랜스폼과 공간
+	{ TEXT("갑판 깃발"), TEXT("甲板の旗"),      TEXT("항구에 들어오자 깃발이 배를 떠나 엉뚱한 곳에 걸린다"), TEXT("港に入ると旗が船を離れて見当違いの場所に掲げられる"),   [] { return ABH_Lab49::StaticClass(); } },
+	{ TEXT("검 줍기"), TEXT("剣を拾う"),        TEXT("주운 검이 손이 아니라 옆 허공에 떠서 따라온다"), TEXT("拾った剣が手ではなく横の空中に浮いてついてくる"),       [] { return ABH_Lab50::StaticClass(); } },
+	{ TEXT("글라이더"), TEXT("グライダー"),       TEXT("기울인 채 조종간을 당기면 엉뚱한 쪽으로 돈다"), TEXT("傾けたまま操縦桿を引くと見当違いの方向へ曲がる"),        [] { return ABH_Lab51::StaticClass(); } },
+	{ TEXT("마법 대포"), TEXT("魔法の大砲"),      TEXT("표적 쪽으로 돌아선 대포가 정면으로만 쏜다"), TEXT("標的のほうへ向き直った大砲が正面にしか撃たない"),        [] { return ABH_Lab52::StaticClass(); } },
+	{ TEXT("레이저 조준선"), TEXT("レーザー照準線"),  TEXT("전차가 원점에서 멀어지면 조준선이 엉뚱한 곳에서 나간다"), TEXT("戦車が原点から離れると照準線が見当違いの場所から出る"), [] { return ABH_Lab53::StaticClass(); } },
+	{ TEXT("감시탑"), TEXT("監視塔"),         TEXT("탑을 높게 만들자 경보 범위가 반으로 줄었다"), TEXT("塔を高くしたら警報範囲が半分になった"),          [] { return ABH_Lab54::StaticClass(); } },
+	{ TEXT("움직이는 발판"), TEXT("動く足場"),  TEXT("발판이 꼼짝하지 않는다 (에러 없음)"), TEXT("足場がびくともしない（エラーなし）"),                [] { return ABH_Lab55::StaticClass(); } },
+	{ TEXT("광부의 랜턴"), TEXT("鉱夫のランタン"),    TEXT("손에 든 랜턴이 발밑에 붙어 있다"), TEXT("手に持ったランタンが足元に付いている"),                [] { return ABH_Lab56::StaticClass(); } },
 };
 constexpr int32 GLabCount = UE_ARRAY_COUNT(GLabs);
 
 // 각 부의 첫 랩 번호 (채점표의 "부" 칸)
-constexpr int32 GPartFirstLab[] = { 1, 5, 14, 21, 25, 29, 32, 35, 38, 40, 45 };
+constexpr int32 GPartFirstLab[] = { 1, 5, 14, 21, 25, 29, 32, 35, 38, 40, 45, 49 };
 
 int32 PartOf(int32 Number)
 {
