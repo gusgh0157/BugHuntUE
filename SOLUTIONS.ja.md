@@ -966,3 +966,111 @@ UStaticMesh* Mesh = BossMesh.Get();                         // SpawnBoss: すで
 ```
 **教訓:** ソフト参照とは「いつロードするかを自分で決める」という意味です。使う直前ではなく前もって (部屋に入るとき、ロード画面で) 非同期でロードし、ハンドルを持っておいて GC に片付けられないようにします。`LoadObject`/`LoadSynchronous`/`StaticLoadObject` をゲームプレイのコードで見かけたら疑います。ラボ 29 の発射音は逆に「非同期で遅すぎた」ケースです。
 
+# 第12部: トランスフォームと空間
+
+## ラボ 49 — SetRelativeLocation にワールド座標を入れた
+```
+間違った結果:     造船所 (原点) では旗がマストの先にあるのに、港では何千 cm も離れた場所にある
+止まった位置:     RaiseFlag の SetRelativeLocation の次の行。Top = 正しいワールド座標、Flag->GetRelativeLocation() = Top、
+               Flag->GetComponentLocation() = 船のトランスフォーム × Top (見当違いの場所)
+本当の原因:       Top はすでに船のトランスフォームを通したワールド座標。Relative は親基準なので、エンジンが船のトランスフォームをもう一度掛けた。
+               船が原点に回転なしで置かれていれば 2 回掛けても同じなので、造船所では表に出なかった。
+```
+**修正:**
+```cpp
+Flag->SetRelativeLocation(MastTop);        // 船基準の座標をそのまま。または Flag->SetWorldLocation(Top);
+```
+**教訓:** 位置を入れるたびに「この値はどの座標系か」を問います。関数名の Relative/World と値の座標系を合わせます。原点に回転なしで置いて行うテストは座標系のバグを隠すので、テスト用のアクターは原点から離れた場所に回して置きます。
+
+## ラボ 50 — 拾う装備を KeepWorldTransform で付けた
+```
+間違った結果:     剣が手から 2m 近く (公開入力では 186 cm) 離れた場所 (床にあった場所) に付いてついてくる。手と向きも違う
+止まった位置:     PickUp の AttachToComponent の次の行。Sword->GetRootComponent()->GetRelativeLocation() = 手を基準に見た「床にあった場所」
+本当の原因:       KeepWorldTransform は、付ける前のワールド トランスフォームを保つように相対トランスフォームを計算する。
+               付けた瞬間に剣が画面上で動かない代わりに、床にあった場所がそのまま手基準のオフセットになる。
+```
+**修正:**
+```cpp
+Sword->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+```
+**教訓:** ルールは位置・回転・スケールごとに別々に決まります。手に握るものは SnapToTarget (位置・回転を対象に合わせる) で、親のスケール (ここでは 1.25) に従ってはいけないものは NotIncludingScale。KeepRelative は「すでに相対値が正しく入っているとき」(コンストラクタで SetupAttachment した後など)、KeepWorld は「付けてもその場にいるべきとき」(走る車の上に落ちた物)。別のルールに変えても、剣の大きさのチェック (1.0) があるので IncludingScale は引っかかります。
+
+## ラボ 51 — ローカル回転をワールド回転の順序で掛けた
+```
+間違った結果:     ロールだけのときは正しい。傾いた後にピッチを入れると、機首がパイロットの頭上ではなく空 (ワールド +Z) のほうへ上がり、翼の軸が変わる
+止まった位置:     Steer。Delta * GetActorQuat() → 今の姿勢を作った後、Delta をワールド軸で適用
+本当の原因:       FQuat の A * B は B を先に、A を後に適用する。Delta * Current はワールド軸の回転、Current * Delta はローカル (機体) 軸の回転。
+               水平 (Current = 単位) からロールだけするときは 2 つの順序が同じで、前の軸を中心に回るロールは順序に関係なく同じに見えるので、ピッチで初めて表に出た。
+```
+**修正:**
+```cpp
+SetActorRotation(GetActorQuat() * Delta);   // または AddActorLocalRotation(Delta);
+```
+**教訓:** 入力が「パイロット/キャラクター基準」ならローカル回転 (`AddActorLocalRotation`、`Current * Delta`)、「世界基準」(風、重力の向きに合わせる) ならワールド回転 (`AddActorWorldRotation`、`Delta * Current`)。`FRotator` の Pitch/Yaw/Roll を足して積み重ねません。オイラー角は Yaw → Pitch → Roll の固定順なので、傾いた姿勢では足した分だけ回らず、ピッチ ±90° 付近では Yaw と Roll の軸が重なって (ジンバルロック) 値が飛びます。積み重ねはクォータニオンで。
+
+## ラボ 52 — FVector::ForwardVector はワールドの +X
+```
+間違った結果:     大砲は標的のほうを向いている (内積 1.000) のに、砲弾は常にワールド +X へ飛ぶ。標的が正面にあるときだけ当たる
+止まった位置:     Fire。Muzzle の計算は GetActorForwardVector()、Velocity は FVector::ForwardVector
+本当の原因:       FVector::ForwardVector は定数 (1, 0, 0)。アクターの回転とは関係がない。
+```
+**修正:**
+```cpp
+Ball->Velocity = GetActorForwardVector() * MuzzleSpeed;
+```
+**教訓:** `FVector::ForwardVector/RightVector/UpVector` はワールド軸の定数、`GetActorForwardVector()`/`Comp->GetForwardVector()` は回転を適用した軸です。同じ関数の中で 2 つが混ざっていたら疑います。`DrawDebugDirectionalArrow` で砲身の向きと速度を一緒に描けば一目でわかります。
+
+## ラボ 53 — 点と方向の変換関数を取り違えた
+```
+間違った結果:     レーザーの始点が、戦車がどこにいても原点の近く。方向は戦車が原点から遠いほどおかしい
+止まった位置:     UpdateLaser。LaserStart = TransformVector(MuzzleOffset) → 平行移動が抜ける、
+               LaserDir = TransformPosition(ForwardVector).GetSafeNormal() → 平行移動が方向に混ざる
+本当の原因:       TransformPosition = スケール・回転・平行移動 (点)、TransformVector = スケール・回転 (方向/変位)、TransformVectorNoScale = 回転のみ。
+               2 行が入れ替わっていた。原点・回転なし・スケール 1 なら 3 つとも同じ値なので表に出ない。
+```
+**修正:**
+```cpp
+LaserStart = ToWorld.TransformPosition(MuzzleOffset);
+LaserDir = ToWorld.TransformVectorNoScale(FVector::ForwardVector);
+```
+**教訓:** 点は Position、方向は Vector (長さがスケールに従うべきならそのまま、単位方向なら NoScale)。逆方向は `InverseTransformPosition`/`InverseTransformVector(NoScale)`。方向に平行移動が混ざると、「原点から離れるほど大きく間違う」という形で現れます。
+
+## ラボ 54 — ルートの非均一スケールが子の球コリジョンを縮めた
+```
+間違った結果:     警報半径 800 なのに 600 cm 先の侵入者に気づかない。ログ: 実際の半径 400 (SphereRadius 800)
+止まった位置:     Build の SetActorScale3D(0.5, 0.5, 高さ)。Alarm->GetScaledSphereRadius() = 800 × 0.5
+本当の原因:       ルートのスケールはすべての子に伝わる。球は非均一に伸ばせないので、エンジンは最も小さい軸のスケール (0.5) を使う。
+               塔の形を作るためのスケールが、警報範囲まで縮めた。
+```
+**修正:**
+```cpp
+Mesh->SetRelativeScale3D(FVector(0.5f, 0.5f, HeightScale));
+Mesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f * HeightScale));   // 底を Base に合わせる
+```
+**教訓:** 形のためのスケールは、形を持つコンポーネントにだけ与えます。ルートをスケール 1 のままにすれば、子 (コリジョン、音、付いたアクター) は影響を受けません。どうしてもルートを伸ばすなら、範囲用のコンポーネントに `SetUsingAbsoluteScale(true)`。カプセルは半径に X・Y の小さいほう、高さに Z を使い、ボックスは軸ごとに別々に伸びます。`show Collision` で実際の大きさを見ます。スケールを消すだけで塔を低くすると、塔の高さのチェックに引っかかります。
+
+## ラボ 55 — Mobility が Static のルートをゲーム中に動かした
+```
+間違った結果:     Tick は毎フレーム SetActorLocation を呼んでいるのに、足場が 0 cm しか動かなかった。クラッシュ・エラーなし
+止まった位置:     Tick の SetActorLocation → false を返す。メッセージログ (PIE): "Mobility of ... has to be 'Movable' if you'd like to move"
+本当の原因:       USceneComponent::CheckStaticMobilityAndWarn: Movable でないコンポーネントは、アクターの初期化後のゲームワールドで移動を拒み、警告だけを残す。
+               スポーン時の最初の位置は初期化前なので入り、「置かれはするが動かない」という形になった。
+```
+**修正:**
+```cpp
+Mesh->SetMobility(EComponentMobility::Movable);
+```
+**教訓:** 動くもの (扉、足場、エレベーター、投射物) は Movable。Static は事前に焼いたライティング・ナビゲーション用です。移動関数の bool の戻り値とメッセージログを確認する習慣をつけます。コンストラクタをコピーしてくるとき、Mobility のような「パフォーマンス用のデフォルト値」がついてこないか確認します (ラボ 26 の Generate Overlap Events と同じ形)。
+
+## ラボ 56 — 存在しないソケット名で付けた
+```
+間違った結果:     ランタンが足元 (メッシュの原点) にある。警告・エラーなし
+止まった位置:     HoldLantern。Mesh->DoesSocketExist(LanternSocket) = false ("RightHandSocket" はこのスケルトンにない)
+本当の原因:       存在しないソケット名だと、AttachToComponent と GetSocketTransform/GetSocketLocation は黙ってコンポーネント自体のトランスフォームを使う。
+               ほかのプロジェクトのキャラクターコードから持ってきたソケット名が、このメッシュにはなかった。
+```
+**修正:**
+```cpp
+FName LanternSocket = TEXT("hand_r");   // このスケルトンの右手のボーン。実際のゲームでは持ち手に合わせたソケットをソケットマネージャーで追加
+```
+**教訓:** ソケット・ボーン名はメッシュ (スケルトン) ごとに違います。コードに書いた名前は `ensure(Mesh->DoesSocketExist(Name))` で確認して、静かな失敗を大きな音に変えます。FName の比較なので大文字・小文字は関係ありませんが、つづりは合っていなければなりません。

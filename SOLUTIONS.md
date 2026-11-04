@@ -962,3 +962,111 @@ UStaticMesh* Mesh = BossMesh.Get();                         // SpawnBoss: 이미
 ```
 **교훈:** 소프트 레퍼런스는 "언제 불러올지 내가 정한다"는 뜻이다. 쓰기 직전이 아니라 미리(방에 들어올 때, 로딩 화면) 비동기로 부르고, 핸들을 들고 있어 GC 가 치우지 않게 한다. `LoadObject`/`LoadSynchronous`/`StaticLoadObject` 를 게임 플레이 코드에서 보면 의심한다. 랩 29 의 발사음은 반대로 "비동기로 너무 늦게" 부른 경우다.
 
+# 12부: 트랜스폼과 공간
+
+## Lab 49 — SetRelativeLocation 에 월드 좌표를 넣음
+```
+틀린 결과:     조선소(원점)에서는 깃발이 돛대 꼭대기에 있는데, 항구에서는 수천 cm 떨어진 곳에 있다
+멈춘 위치:     RaiseFlag 의 SetRelativeLocation 다음 줄. Top = 맞는 월드 좌표, Flag->GetRelativeLocation() = Top,
+               Flag->GetComponentLocation() = 배 트랜스폼 × Top (엉뚱한 곳)
+진짜 원인:     Top 은 배의 트랜스폼을 이미 거친 월드 좌표다. Relative 는 부모 기준이라 엔진이 배의 트랜스폼을 한 번 더 곱했다.
+               배가 원점에 회전 없이 있으면 두 번 곱해도 같아서 조선소에서는 드러나지 않았다.
+```
+**수정:**
+```cpp
+Flag->SetRelativeLocation(MastTop);        // 배 기준 좌표를 그대로. 또는 Flag->SetWorldLocation(Top);
+```
+**교훈:** 위치를 넣을 때마다 "이 값은 어느 좌표계인가"를 묻는다. 함수 이름의 Relative/World 와 값의 좌표계를 맞춘다. 원점에 회전 없이 놓고 하는 테스트는 좌표계 버그를 숨기니, 테스트 액터는 원점에서 떨어진 곳에 돌려 놓는다.
+
+## Lab 50 — 줍는 장비를 KeepWorldTransform 으로 붙임
+```
+틀린 결과:     검이 손에서 2m 가까이(공개 입력 186 cm) 떨어진 곳(바닥에 있던 자리)에 붙어서 따라온다. 손과 방향도 다르다
+멈춘 위치:     PickUp 의 AttachToComponent 다음 줄. Sword->GetRootComponent()->GetRelativeLocation() = 손 기준으로 본 "바닥에 있던 자리"
+진짜 원인:     KeepWorldTransform 은 붙이기 전의 월드 트랜스폼을 유지하도록 상대 트랜스폼을 계산한다.
+               붙는 순간 검이 화면에서 움직이지 않는 대신, 바닥에 있던 자리가 그대로 손 기준 오프셋이 된다.
+```
+**수정:**
+```cpp
+Sword->AttachToComponent(Hand, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+```
+**교훈:** 규칙은 위치·회전·스케일마다 따로 정해진다. 손에 쥐는 것은 SnapToTarget(위치·회전을 대상에 맞춤)이고, 부모 스케일(여기서는 1.25)을 따라가면 안 되는 것은 NotIncludingScale. KeepRelative 는 "이미 상대 값이 맞게 들어 있을 때"(생성자에서 SetupAttachment 한 뒤처럼), KeepWorld 는 "붙여도 제자리에 있어야 할 때"(달리는 차 위에 떨어진 물건). 다른 규칙으로 바꿔도 검 크기 검사(1.0)가 있어 IncludingScale 은 걸린다.
+
+## Lab 51 — 로컬 회전을 월드 회전 순서로 곱함
+```
+틀린 결과:     롤만 할 때는 맞다. 기울어진 뒤 피치를 넣으면 기수가 조종사 머리 위가 아니라 하늘(월드 +Z) 쪽으로 들리고 날개 축이 바뀐다
+멈춘 위치:     Steer. Delta * GetActorQuat() → 지금 자세를 만든 뒤 Delta 를 월드 축으로 적용
+진짜 원인:     FQuat 의 A * B 는 B 를 먼저, A 를 나중에 적용한다. Delta * Current 는 월드 축 회전, Current * Delta 는 로컬(기체) 축 회전.
+               수평(Current = 항등)에서 롤만 할 때는 두 순서가 같고, 앞 축을 중심으로 돈 롤은 순서와 상관없이 같아 보여서 피치에서야 드러났다.
+```
+**수정:**
+```cpp
+SetActorRotation(GetActorQuat() * Delta);   // 또는 AddActorLocalRotation(Delta);
+```
+**교훈:** 입력이 "조종사/캐릭터 기준"이면 로컬 회전(`AddActorLocalRotation`, `Current * Delta`), "세상 기준"(바람, 중력 방향 맞추기)이면 월드 회전(`AddActorWorldRotation`, `Delta * Current`). `FRotator` 의 Pitch/Yaw/Roll 을 더해서 누적하지 않는다. 오일러 각은 Yaw → Pitch → Roll 고정 순서라 기울어진 자세에서는 더한 만큼 돌지 않고, 피치 ±90° 근처에서는 Yaw 와 Roll 축이 겹쳐(짐벌 락) 값이 튄다. 누적은 쿼터니언으로.
+
+## Lab 52 — FVector::ForwardVector 는 월드 +X
+```
+틀린 결과:     대포는 표적 쪽을 보고 있는데(내적 1.000) 포탄은 늘 월드 +X 로 날아간다. 표적이 정면에 있을 때만 맞는다
+멈춘 위치:     Fire. Muzzle 계산은 GetActorForwardVector(), Velocity 는 FVector::ForwardVector
+진짜 원인:     FVector::ForwardVector 는 상수 (1, 0, 0) 이다. 액터 회전과 상관이 없다.
+```
+**수정:**
+```cpp
+Ball->Velocity = GetActorForwardVector() * MuzzleSpeed;
+```
+**교훈:** `FVector::ForwardVector/RightVector/UpVector` 는 월드 축 상수, `GetActorForwardVector()`/`Comp->GetForwardVector()` 는 회전을 적용한 축이다. 같은 함수 안에서 둘이 섞여 있으면 의심한다. `DrawDebugDirectionalArrow` 로 포신 방향과 속도를 같이 그리면 한눈에 보인다.
+
+## Lab 53 — 점과 방향의 변환 함수를 바꿔 씀
+```
+틀린 결과:     레이저 시작점이 전차가 어디 있든 원점 근처. 방향은 전차가 원점에서 멀수록 엉뚱하다
+멈춘 위치:     UpdateLaser. LaserStart = TransformVector(MuzzleOffset) → 평행이동 빠짐,
+               LaserDir = TransformPosition(ForwardVector).GetSafeNormal() → 평행이동이 방향에 섞임
+진짜 원인:     TransformPosition = 스케일·회전·평행이동(점), TransformVector = 스케일·회전(방향/변위), TransformVectorNoScale = 회전만.
+               두 줄이 서로 바뀌었다. 원점·회전 없음·스케일 1 이면 셋 다 같은 값이라 드러나지 않는다.
+```
+**수정:**
+```cpp
+LaserStart = ToWorld.TransformPosition(MuzzleOffset);
+LaserDir = ToWorld.TransformVectorNoScale(FVector::ForwardVector);
+```
+**교훈:** 점은 Position, 방향은 Vector(길이가 스케일을 따라야 하면 그대로, 단위 방향이면 NoScale). 반대 방향은 `InverseTransformPosition`/`InverseTransformVector(NoScale)`. 방향에 평행이동이 섞이면 "원점에서 멀어질수록 더 틀린다"는 모양으로 나타난다.
+
+## Lab 54 — 루트의 비균일 스케일이 자식 구 콜리전을 줄임
+```
+틀린 결과:     경보 반경 800 인데 600 cm 앞의 침입자를 못 본다. 로그: 실제 반경 400 (SphereRadius 800)
+멈춘 위치:     Build 의 SetActorScale3D(0.5, 0.5, 높이). Alarm->GetScaledSphereRadius() = 800 × 0.5
+진짜 원인:     루트 스케일은 모든 자식에 전해진다. 구는 비균일하게 늘일 수 없어서 엔진은 가장 작은 축 스케일(0.5)을 쓴다.
+               탑 모양을 내려던 스케일이 경보 범위까지 줄였다.
+```
+**수정:**
+```cpp
+Mesh->SetRelativeScale3D(FVector(0.5f, 0.5f, HeightScale));
+Mesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f * HeightScale));   // 바닥을 Base 에 맞춤
+```
+**교훈:** 모양을 위한 스케일은 모양을 가진 컴포넌트에만 준다. 루트는 스케일 1 로 두면 자식(콜리전, 소리, 붙은 액터)이 영향을 받지 않는다. 꼭 루트를 늘여야 하면 범위 컴포넌트에 `SetUsingAbsoluteScale(true)`. 캡슐은 반지름에 X·Y 중 작은 쪽, 높이에 Z 를 쓰고, 박스는 축마다 따로 늘어난다. `show Collision` 으로 실제 크기를 본다. 스케일만 지워서 탑을 낮추면 탑 높이 검사가 걸린다.
+
+## Lab 55 — Mobility 가 Static 인 루트를 게임 중에 옮김
+```
+틀린 결과:     Tick 은 매 프레임 SetActorLocation 을 부르는데 발판이 0 cm 움직였다. 크래시·에러 없음
+멈춘 위치:     Tick 의 SetActorLocation → false 반환. 메시지 로그(PIE): "Mobility of ... has to be 'Movable' if you'd like to move"
+진짜 원인:     USceneComponent::CheckStaticMobilityAndWarn: Movable 이 아닌 컴포넌트는 액터가 초기화된 뒤 게임 월드에서 이동을 거부하고 경고만 남긴다.
+               스폰할 때의 첫 위치는 초기화 전이라 들어가서 "놓이기는 하는데 안 움직이는" 모양이 됐다.
+```
+**수정:**
+```cpp
+Mesh->SetMobility(EComponentMobility::Movable);
+```
+**교훈:** 움직이는 것(문, 발판, 엘리베이터, 투사체)은 Movable. Static 은 미리 구운 조명·내비게이션용이다. 이동 함수의 bool 반환값과 메시지 로그를 확인하는 습관을 들인다. 생성자를 복사해 올 때 Mobility 같은 "성능용 기본값"이 따라오는지 본다(랩 26 의 Generate Overlap Events 와 같은 모양).
+
+## Lab 56 — 없는 소켓 이름으로 붙임
+```
+틀린 결과:     랜턴이 발밑(메시 원점)에 있다. 경고·에러 없음
+멈춘 위치:     HoldLantern. Mesh->DoesSocketExist(LanternSocket) = false ("RightHandSocket" 은 이 스켈레톤에 없음)
+진짜 원인:     없는 소켓 이름이면 AttachToComponent 와 GetSocketTransform/GetSocketLocation 은 조용히 컴포넌트 자체의 트랜스폼을 쓴다.
+               다른 프로젝트의 캐릭터 코드에서 가져온 소켓 이름이 이 메시에는 없었다.
+```
+**수정:**
+```cpp
+FName LanternSocket = TEXT("hand_r");   // 이 스켈레톤의 오른손 뼈. 실제 게임에서는 손잡이에 맞춘 소켓을 소켓 매니저로 추가
+```
+**교훈:** 소켓·뼈 이름은 메시(스켈레톤)마다 다르다. 코드에 적은 이름은 `ensure(Mesh->DoesSocketExist(Name))` 로 확인해 조용한 실패를 큰 소리로 바꾼다. FName 비교라 대소문자는 상관없지만 철자는 맞아야 한다.
