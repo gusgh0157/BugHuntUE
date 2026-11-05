@@ -9,6 +9,7 @@ namespace
 {
 	bool GFixedFrameRate = false;
 	std::atomic<int32> GRaceArrivals { 0 };
+	std::atomic<int32> GRaceMisses { 0 };
 	std::atomic<int32> GReallocCount { 0 };
 }
 
@@ -16,6 +17,7 @@ void ResetProbes()
 {
 	SetFixedFrameRate(0.f);
 	GRaceArrivals = 0;
+	GRaceMisses = 0;
 	GReallocCount = 0;
 }
 
@@ -47,6 +49,15 @@ void RaceWindow(int32 TimeoutMs)
 	{
 		FPlatformProcess::Sleep(0.0005f);
 	}
+	if (GRaceArrivals.load() <= Arrival)
+	{
+		++GRaceMisses;
+	}
+}
+
+int32 RaceWindowMisses()
+{
+	return GRaceMisses.load();
 }
 
 void* FCountingMalloc::Realloc(void* Original, SIZE_T Count, uint32 Alignment)

@@ -237,11 +237,12 @@ Velocity *= FMath::Pow(Friction, DeltaSeconds * 60.f);    // "1/60 초마다 0.9
 
 ## Lab 13 — 구조체 멤버에 초기값이 없음
 ```
-틀린 결과:     2라운드 킬이 1, 1, 1 이어야 하는데 -1527265117, 40405, ... (실행마다 다를 수 있음)
+틀린 결과:     공개 입력: 2라운드 킬이 1, 1, 1 이어야 하는데 3, 3, 3 (1라운드 2, 2, 2 + 2라운드 1, 1, 1), 2라운드 전체 데스 3 이어야 하는데 9.
+               1라운드 원소가 처음 받은 메모리도 0 으로 채워지지 않으므로, 그 메모리가 0 이 아니었으면 -1527265117 같은 값이 섞인다(채점 로그에서 둘 다 나온다).
 멈춘 위치:     두 번째 StartRound 의 AddDefaulted_GetRef 다음 줄. Entry.Player 는 새 이름, Kills/Deaths 는 이상한 값.
                에디터를 켤 때 Output Log: LogClass: Error: IntProperty FBH_RoundStats::Kills is not initialized properly.
 진짜 원인:     FBH_RoundStats 의 Kills, Deaths 에 초기값이 없다. AddDefaulted 는 기본 생성자를 부르는데, 초기값이 없으면 int32 는
-               그 자리에 있던 바이트 그대로다. Stats.Reset() 은 메모리를 남겨 두므로 그 자리에는 1라운드 기록(과 그 전의 쓰레기)이 있었다.
+               그 자리에 있던 바이트 그대로다. Stats.Reset() 은 메모리를 남겨 두므로 그 자리에는 1라운드 기록이 있었다(1라운드가 쓰레기에서 시작했다면 그 쓰레기 + 1라운드 기록).
                ABH_RoundBoard::Round 는 초기값이 없어도 0 에서 시작했다. UObject 는 메모리를 0 으로 채운 뒤 만들어지기 때문이다.
 ```
 **수정:**
@@ -333,7 +334,7 @@ LaserDir = ToWorld.TransformVectorNoScale(FVector::ForwardVector);
 Mesh->SetRelativeScale3D(FVector(0.5f, 0.5f, HeightScale));
 Mesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f * HeightScale));   // 바닥을 Base 에 맞춤
 ```
-**교훈:** 모양을 위한 스케일은 모양을 가진 컴포넌트에만 준다. 루트는 스케일 1 로 두면 자식(콜리전, 소리, 붙은 액터)이 영향을 받지 않는다. 꼭 루트를 늘여야 하면 범위 컴포넌트에 `SetUsingAbsoluteScale(true)`. 캡슐은 반지름에 X·Y 중 작은 쪽, 높이에 Z 를 쓰고, 박스는 축마다 따로 늘어난다. `show Collision` 으로 실제 크기를 본다. 스케일만 지워서 탑을 낮추면 탑 높이 검사가 걸린다.
+**교훈:** 모양을 위한 스케일은 모양을 가진 컴포넌트에만 준다. 루트는 스케일 1 로 두면 자식(콜리전, 소리, 붙은 액터)이 영향을 받지 않는다. 꼭 루트를 늘여야 하면 범위 컴포넌트에 `SetUsingAbsoluteScale(true)`. 캡슐 컴포넌트는 구처럼 세 축 중 가장 작은 스케일로 반지름과 높이를 함께 늘이고(비균일 스케일 미지원, `GetScaledCapsuleRadius`/`HalfHeight`), 박스만 축마다 따로 늘어난다. `show Collision` 으로 실제 크기를 본다. 스케일만 지워서 탑을 낮추면 탑 높이 검사가 걸린다.
 
 ## Lab 20 — Mobility 가 Static 인 루트를 게임 중에 옮김
 ```
@@ -936,7 +937,7 @@ while (Frontier.Num() > 0)
 
 ## Lab 50 — 잠금 없는 읽기-계산-쓰기 (lost update)
 ```
-틀린 결과:     금고 골드 기대 1000, 실제 500 (공개 입력: 100+200+300+400. 어느 둘이 겹치느냐에 따라 500~700)
+틀린 결과:     금고 골드 기대 1000, 실제 예: 500 (공개 입력: 100+200+300+400. 어느 둘이 겹치느냐에 따라 값이 다르다)
 멈춘 위치:     Gold = Before + Amount 줄에 중단점 → 병렬 스택: 두 스레드가 같은 줄에 서 있고 둘 다 Before = 0
 진짜 원인:     Gold += Amount 는 읽기, 더하기, 쓰기 세 단계다. 두 스레드가 같은 값을 읽고 각자 써서 한쪽 입금이 사라졌다.
                (RaceWindow 는 이 틈을 넓혀 매번 겹치게 할 뿐이다.)

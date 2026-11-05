@@ -78,11 +78,11 @@ void ABH_Lab53::StartLab()
 #pragma region 힌트 1 / ヒント 1 (먼저 직접 추적해 보고 펼치세요 / まず自分で追跡してから開いてください)
 // 결과는 맞는데 검색 횟수가 너무 많습니다. PIE 에서 콘솔 stat game, stat unit 을 켜고 BugHunt.Lab 53 를 실행해 보세요. Game 시간이 얼마나 뛰나요?
 // 어디서 시간을 쓰는지 보려면 명령줄에 -trace=cpu 를 붙여 실행하고 Unreal Insights 로 열어 Timing 창에서 긴 프레임을 고르세요.
-// (stat startfile / stat stopfile 로 남긴 .ue4stats 파일도 Insights 나 Session Frontend 에서 열 수 있습니다.)
+// (Insights 가 여는 것은 -trace 로 남긴 .utrace 입니다. stat startfile / stat stopfile 의 .ue4stats 는 비추천된 Session Frontend 의 Profiler 용입니다.)
 
 // [JA] 結果は合っていますが、検索回数が多すぎます。PIE でコンソールの stat game、stat unit をオンにして BugHunt.Lab 53 を実行してみてください。Game の時間はどれくらい跳ね上がりますか？
 // [JA] どこで時間を使っているか見るには、コマンドラインに -trace=cpu を付けて実行し、Unreal Insights で開いて Timing ウィンドウで長いフレームを選んでください。
-// [JA] （stat startfile / stat stopfile で残した .ue4stats ファイルも Insights や Session Frontend で開けます。）
+// [JA] （Insights が開くのは -trace で残した .utrace です。stat startfile / stat stopfile の .ue4stats は非推奨の Session Frontend の Profiler 用です。）
 #pragma endregion
 
 #pragma region 힌트 2 / ヒント 2

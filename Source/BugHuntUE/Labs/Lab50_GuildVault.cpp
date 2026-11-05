@@ -10,6 +10,7 @@ namespace Lab50Text
 {
 BH_TEXT(Quests, "길드원 %d명이 동시에 퀘스트를 끝내고 보상을 금고에 넣는다. 합계 %d 골드.", "ギルドメンバー %d 人が同時にクエストを終え、報酬を金庫に入れる。合計 %d ゴールド。");
 BH_TEXT(VaultGold, "금고의 골드", "金庫のゴールド");
+BH_TEXT(NoOverlap, "확대경(RaceWindow): 짝을 못 만나고 혼자 지나간 스레드 %d개 = 그만큼 겹침이 일어나지 않았다. 잠금으로 고쳤거나 길드원 수가 홀수면 정상. 고치기 전인데 골드가 맞다면 이 PC 에서 레이스가 재현되지 않은 것이다.", "拡大鏡（RaceWindow）: 相手に会えず 1 人で通過したスレッド %d 個 = その分だけ重なりが起きなかった。ロックで直したか、ギルドメンバー数が奇数なら正常。直す前なのにゴールドが合っているなら、この PC ではレースが再現されなかった。");
 }
 
 void FBH_GuildVault::Deposit(int32 Amount)
@@ -42,6 +43,10 @@ void ABH_Lab50::StartLab()
 		Vault.Deposit(Rewards[Index]);
 	}, EParallelForFlags::Unbalanced);
 
+	if (const int32 Misses = BugHunt::RaceWindowMisses())
+	{
+		BugHunt::Note(BugHunt::Fmt<Lab50Text::NoOverlap>(Misses));
+	}
 	BugHunt::Expect(BugHunt::Tr<Lab50Text::VaultGold>(), Expected, Vault.Gold);
 	FinishLab();
 }
